@@ -1,0 +1,4306 @@
+### USER
+Recheck and Improve the System
+Please recheck the entire system thoroughly and provide the findings as a `.md` file.
+
+The objective is to determine whether the system can be improved further in any way. Do not limit the analysis to the current approach. Look for potential improvements using any suitable method, including:
+
+* Mathematical models
+* Financial models
+* Statistical methods
+* Algorithms
+* Optimization techniques
+* LLM/AI layers
+* Architecture changes
+* Better decision-making approaches
+* Any other relevant technology or methodology
+
+Compare the existing approach with possible alternatives and identify where a different method could provide better results, accuracy, efficiency, reliability, scalability, or cost-effectiveness.
+Also check whether previous audit findings, assumptions, or recommendations are still valid and whether anything important has been missed.
+Be critical and do not assume the current system is already optimal.
+The final `.md` report should clearly explain:
+
+1. What is already good.
+2. What can be improved.
+3. What new approaches could be considered.
+4. Why each proposed improvement may be better.
+5. Any risks, trade-offs, or additional complexity.
+6. Which improvements are worth implementing and which are not.
+
+Focus especially on finding new, meaningful improvements that may have been overlooked previously, rather than simply repeating the existing audit findings.
+
+### ASSISTANT
+Save as: `.agency/active/engineering/34_system_recheck_and_improvement_audit.md`
+
+---
+
+# AlphaSentinel System Re-Check & Improvement Audit
+
+**Document Type:** Independent System Re-Audit & Improvement Proposal  
+**Scope:** Full-system review based on the provided repository snapshot  
+**Objective:** Determine whether the current system can be materially improved using better mathematical, financial, statistical, algorithmic, AI, architectural, and operational approaches.  
+**Posture:** Critical. The current system should not be assumed optimal.
+
+---
+
+## Executive Summary
+
+The AlphaSentinel system already has a strong foundation: layered screening, deterministic risk gating, Shariah controls, multi-agent debate, reconciliation, drawdown controls, and an audit-driven development process. It is significantly better than a typical retail trading bot.
+
+However, after rechecking the system end-to-end, the conclusion is:
+
+> **The system is promising but not yet robust enough to be considered production-grade for live capital without major improvements.**
+
+The largest weaknesses are not obvious coding bugs. They are higher-order quant, data, decision-making, and operational weaknesses:
+
+1. **Insufficient statistical validation of strategy performance**
+2. **Weak transaction-cost and slippage realism**
+3. **ML probabilities likely used without proper calibration**
+4. **No full portfolio-level optimization**
+5. **Execution modeling is too simplistic for live markets**
+6. **LLM debate layer can introduce overconfidence, hallucination, or prompt-injection risk**
+7. **Data governance and point-in-time correctness need major hardening**
+8. **Risk management is good at trade level but incomplete at portfolio and tail-risk level**
+9. **Feedback loop may overfit to recent noise if not carefully controlled**
+10. **Operational architecture needs stronger observability, idempotency, and disaster recovery**
+
+The most important new improvement opportunities are not “more indicators.” They are:
+
+- **Calibrated probabilistic decision-making**
+- **Cost-aware walk-forward validation**
+- **Portfolio construction and risk budgeting**
+- **Bitemporal point-in-time data infrastructure**
+- **Conformal prediction / selective trading**
+- **Robust execution and transaction-cost analysis**
+- **Structured LLM outputs with deterministic fact-checking**
+- **Model drift monitoring and automatic de-risking**
+- **Better Shariah data quality and purification accounting**
+- **A proper research-to-production MLOps pipeline**
+
+This report identifies what is already good, what can be improved, what new approaches should be considered, why they may be better, the trade-offs involved, and which initiatives are worth implementing.
+
+---
+
+# 1. What Is Already Good
+
+The system has many strong design choices that should be preserved.
+
+## 1.1 Strong Layered Architecture
+
+The system separates concerns into clear tiers:
+
+- Ingestion
+- Compliance / Shariah gating
+- Quantitative screening
+- ML scoring
+- Multi-agent debate
+- Risk arbiter
+- Execution / reconciliation
+- Notification / reporting
+
+This is much better than a monolithic strategy script.
+
+### Why this is good
+
+- Easier debugging
+- Easier testing
+- Clearer failure isolation
+- Better auditability
+- Easier to add new signals without breaking the whole pipeline
+
+**Verdict:** Keep this layered architecture.
+
+---
+
+## 1.2 Deterministic Risk Node Is a Very Good Design Choice
+
+The existence of a deterministic risk manager / risk arbiter separate from LLM judgment is excellent.
+
+The principle:
+
+> LLMs may advise, but deterministic risk logic should have final authority over sizing and rejection.
+
+is correct.
+
+### Why this is good
+
+- Prevents LLM hallucinations from directly controlling capital
+- Makes risk behavior reproducible
+- Allows mathematical verification
+- Reduces legal and operational risk
+
+**Verdict:** Preserve and strengthen this pattern.
+
+---
+
+## 1.3 Shariah Compliance Is Taken Seriously
+
+The system includes:
+
+- Shariah screening rules
+- Net liquid asset checks
+- Purification logging
+- Monthly purification reporting
+
+This is a meaningful differentiator.
+
+### Why this is good
+
+- Creates a defensible niche
+- Adds ethical / religious compliance value
+- Encourages data discipline
+- Requires explicit audit trails
+
+**Verdict:** Worth preserving, but the data quality and scholarly governance around it must be improved.
+
+---
+
+## 1.4 Multi-Agent Debate Is Conceptually Useful
+
+The Bull / Bear / Judge architecture is a sensible attempt to reduce one-sided analysis.
+
+### Why this is good
+
+- Encourages adversarial review
+- May catch narrative blind spots
+- Produces richer explanations
+- Can improve human trust and oversight
+
+**Verdict:** Keep the concept, but reduce reliance on free-form LLM conviction scores.
+
+---
+
+## 1.5 Reconciliation and Circuit Breakers Exist
+
+The presence of:
+
+- EOD reconciliation
+- Drawdown check
+- System halt state
+- Sentinel monitoring
+- Paper-trade evaluation
+
+shows operational awareness.
+
+### Why this is good
+
+- Reduces silent failure
+- Encourages safe shutdown
+- Supports paper-trading validation
+- Creates a path toward live safety
+
+**Verdict:** Good foundation, but needs more automation, observability, and portfolio-level risk controls.
+
+---
+
+## 1.6 The Development Process Is Audit-Driven
+
+The repository includes:
+
+- Master Critic reviews
+- Devil’s Advocate critiques
+- Engineering phase gates
+- Human sign-off blocks
+- Continuous improvement loops
+- Explicit remediation tables
+
+This is unusually mature for a trading system.
+
+### Why this is good
+
+- Reduces careless code changes
+- Encourages documentation
+- Makes regressions more visible
+- Helps institutionalize learning
+
+**Verdict:** Strong cultural / process asset.
+
+---
+
+# 2. What Can Be Improved
+
+This section focuses on weaknesses that materially affect performance, reliability, scalability, or safety.
+
+---
+
+## Finding 1: Backtesting Is Not Statistically Strong Enough
+
+### Current State
+
+The system appears to use:
+
+- Historical OHLCV data
+- Momentum / mean-reversion / ML factor models
+- Out-of-sample split logic
+- Basic metrics such as CAGR, Max Drawdown, Sharpe Ratio
+
+This is a good start, but it is not enough.
+
+### Weakness
+
+The current validation likely underestimates:
+
+- Overfitting
+- Selection bias
+- Survivorship bias
+- Multiple testing bias
+- Transaction-cost drag
+- Liquidity constraints
+- Regime dependence
+- Luck versus skill
+
+### Why this matters
+
+A strategy can look excellent in backtests and still fail live due to:
+
+- Data leakage
+- Unrealistic fills
+- Cost blindness
+- Universe survivorship
+- Over-optimized thresholds
+- Regime-specific performance
+
+### Recommended Improvement
+
+Upgrade the backtesting framework into a **statistically rigorous research engine**.
+
+It should include:
+
+1. **Walk-forward validation**
+2. **Purged k-fold cross-validation**
+3. **Embargo periods between train/test folds**
+4. **Transaction-cost modeling**
+5. **Slippage modeling**
+6. **Point-in-time universe construction**
+7. **Bootstrap confidence intervals**
+8. **Deflated Sharpe Ratio**
+9. **Probability of Backtest Overfitting (PBO)**
+10. **Combinatorial purged cross-validation**
+
+### Mathematical Improvement
+
+Instead of relying only on Sharpe Ratio, evaluate:
+
+\[
+\text{Expected Utility} = \mu_p - \lambda \sigma_p^2 - \text{Costs}
+\]
+
+and report uncertainty:
+
+\[
+\widehat{SR} \pm z \cdot SE(\widehat{SR})
+\]
+
+Also use:
+
+- **Deflated Sharpe Ratio**
+- **White Reality Check**
+- **Bootstrap p-values**
+- **Out-of-sample economic profit after costs**
+
+### Better Alternative
+
+Replace simple 50/50 time split with:
+
+- Nested walk-forward validation
+- Rolling retraining windows
+- Regime-aware evaluation
+- Cost-aware objective functions
+
+### Risks / Trade-Offs
+
+- More complex research infrastructure
+- Slower experimentation
+- Requires more engineering discipline
+
+### Worth Implementing?
+
+**Yes — P0 Critical**
+
+---
+
+## Finding 2: Transaction Costs and Market Impact Are Probably Underestimated
+
+### Current State
+
+The system includes liquidity tiers and ADTV participation checks, which is good.
+
+But there is not enough evidence of a full live-cost model.
+
+### Weakness
+
+In Indian equities, actual round-trip costs can materially destroy short-horizon alpha.
+
+Costs include:
+
+- Brokerage
+- STT
+- Exchange transaction charges
+- GST
+- Stamp duty
+- SEBI charges
+- Slippage
+- Market impact
+- Opportunity cost of partial fills
+
+### Why this matters
+
+A strategy with:
+
+- High turnover
+- Small expected edge per trade
+- Entry into mid/small caps
+
+can become unprofitable once real costs are included.
+
+### Recommended Improvement
+
+Build a dedicated **Transaction Cost Model**.
+
+Example structure:
+
+\[
+\text{Total Cost} =
+\text{Fixed Fees}
++ \text{Spread Cost}
++ \text{Market Impact}
++ \text{Delay Cost}
+\]
+
+For impact, use a square-root model:
+
+\[
+\text{Impact} \approx \eta \cdot \sigma \cdot \sqrt{\frac{Q}{ADV}}
+\]
+
+where:
+
+- \(\eta\) = impact coefficient
+- \(\sigma\) = volatility
+- \(Q\) = order quantity
+- \(ADV\) = average daily volume
+
+### Better Alternative
+
+Instead of static slippage assumptions, implement:
+
+- Liquidity-tier-specific slippage curves
+- Spread-aware cost estimates
+- Circuit-band fill risk modeling
+- Partial-fill simulation
+- Order-book impact model if level-2 data becomes available
+
+### Risks / Trade-Offs
+
+- Requires calibration data
+- More complex backtesting
+- May reduce apparent backtest performance
+
+### Worth Implementing?
+
+**Yes — P0 Critical**
+
+---
+
+## Finding 3: ML Probability Thresholds Are Likely Arbitrary
+
+### Current State
+
+The system uses a second opinion gate such as:
+
+- Conviction >= 7.0
+- ML probability > 0.50
+
+This is understandable, but probably not optimal.
+
+### Weakness
+
+A threshold of 0.50 assumes:
+
+- The model is well calibrated
+- The costs of false positives and false negatives are symmetric
+- Market regime is constant
+- Probability alone is sufficient to trade
+
+None of those assumptions are guaranteed.
+
+### Why this matters
+
+If model probabilities are not calibrated:
+
+- A predicted 0.70 may actually behave like 0.55
+- A predicted 0.55 may be meaningless
+- The gate may approve bad trades or reject good ones
+
+### Recommended Improvement
+
+Add **probability calibration**:
+
+- Platt scaling
+- Isotonic regression
+- Beta calibration
+- Conformal prediction
+
+Then evaluate:
+
+- Brier score
+- Expected Calibration Error (ECE)
+- Reliability diagrams
+- Calibration by regime
+- Calibration by liquidity tier
+
+### Decision-Theoretic Improvement
+
+Trade only if:
+
+\[
+E[\text{Net Profit} \mid \text{signal}] > \text{Cost} + \text{Risk Premium}
+\]
+
+not simply if:
+
+\[
+p > 0.50
+\]
+
+### Better Alternative
+
+Use **Selective Prediction**:
+
+- Trade only when calibrated confidence is high
+- Abstain when uncertainty is high
+- Reduce size when disagreement or entropy is high
+
+### Risks / Trade-Offs
+
+- Fewer trades
+- More infrastructure
+- May require larger validation sample
+
+### Worth Implementing?
+
+**Yes — P0 Critical**
+
+---
+
+## Finding 4: There Is No True Portfolio-Level Optimization
+
+### Current State
+
+The system seems to rely on:
+
+- Top candidates
+- Position sizing by risk arbiter
+- Max position limits
+- Sector exposure constraints
+
+This is better than random sizing, but it is still not full portfolio construction.
+
+### Weakness
+
+Trade-by-trade sizing ignores:
+
+- Correlation among positions
+- Factor concentration
+- Beta concentration
+- Liquidity interaction
+- Turnover cost
+- Portfolio-level drawdown risk
+- Covariance estimation error
+
+### Why this matters
+
+Three individually “safe” trades can still create one highly correlated risk bet.
+
+Example:
+
+- Three momentum stocks in the same macro regime
+- All highly sensitive to index drawdown
+- All illiquid under stress
+
+### Recommended Improvement
+
+Introduce a portfolio optimizer.
+
+A good starting objective:
+
+\[
+\max_w \quad w^T \mu - \gamma w^T \Sigma w - \text{TC}(\Delta w)
+\]
+
+subject to:
+
+- Long-only constraint
+- Max position weight
+- Max sector exposure
+- Liquidity / ADV constraints
+- Shariah eligibility
+- Turnover limits
+- Cash exposure target
+
+### Better Alternatives
+
+Use one or more of:
+
+1. **Robust Mean-Variance Optimization**
+2. **Risk Parity / Risk Budgeting**
+3. **CVaR Minimization**
+4. **Black-Litterman with priors**
+5. **Hierarchical Risk Parity (HRP)**
+6. **Fractional Kelly sizing**
+7. **Volatility targeting**
+
+### Practical Starting Point
+
+Do not begin with a complex optimizer.
+
+Start with:
+
+- Shrinkage covariance estimator
+- Volatility-targeted sizing
+- Risk contribution caps
+- Turnover penalty
+- Integer lot rounding
+
+### Risks / Trade-Offs
+
+- Estimation error can create unstable weights
+- Optimization can become overfit
+- Adds dependency on solver and constraints engineering
+
+### Worth Implementing?
+
+**Yes — P0 / P1 Critical**
+
+---
+
+## Finding 5: Risk Management Is Strong at Trade Level but Weak at Tail-Risk Level
+
+### Current State
+
+The system uses:
+
+- ATR stop-loss
+- Target-based exits
+- Position caps
+- Sector caps
+- Monthly drawdown breaker
+
+This is good.
+
+### Weakness
+
+It may not sufficiently handle:
+
+- Gap risk
+- Correlation risk
+- Liquidity collapse
+- Regime shifts
+- Fat tails
+- Model failure
+- Data anomalies
+- Crowding risk
+
+### Why this matters
+
+Most catastrophic losses do not come from average days. They come from:
+
+- Gap-down openings
+- Limit-down conditions
+- Sector-wide crashes
+- Liquidity dry-ups
+- Strategy crowding
+
+### Recommended Improvement
+
+Build a **portfolio risk engine** with:
+
+1. VaR
+2. CVaR / Expected Shortfall
+3. Stress testing
+4. Reverse stress testing
+5. Correlation-adjusted exposure
+6. Factor exposure monitoring
+7. Drawdown-linked risk scaling
+8. Volatility targeting
+9. Model drift kill-switch
+10. Data anomaly kill-switch
+
+### Mathematical Improvements
+
+Use:
+
+\[
+CVaR_{\alpha} = E[L \mid L > VaR_{\alpha}]
+\]
+
+and dynamic leverage:
+
+\[
+L_t = \min\left(1, \frac{\sigma_{target}}{\hat{\sigma}_{p,t}}\right)
+\]
+
+### Better Alternative
+
+Instead of a hard monthly 6% stop only, use smooth risk reduction:
+
+- Reduce exposure as volatility rises
+- Reduce exposure as drawdown approaches limit
+- Re-enter only after regime stabilization
+- Use CPPI-like drawdown control
+
+### Risks / Trade-Offs
+
+- More complexity
+- Risk models can fail in extreme regimes
+- Requires careful calibration
+
+### Worth Implementing?
+
+**Yes — P0 / P1 Critical**
+
+---
+
+## Finding 6: Execution Modeling Is Too Simplistic for Live Trading
+
+### Current State
+
+There is an order manager and paper execution logic. That is useful.
+
+But live execution is much harder.
+
+### Weakness
+
+Paper systems often assume:
+
+- Full fills
+- Immediate fills
+- No queue position
+- No adverse selection
+- No partial fills
+- No circuit-limit blocking
+- No market impact
+- No latency
+
+Those assumptions are dangerous.
+
+### Recommended Improvement
+
+Build a realistic execution layer with:
+
+- Order state machine
+- Partial fill handling
+- Reject / cancel / replace logic
+- Idempotency keys
+- Timeout handling
+- Reconciliation with broker
+- Transaction Cost Analysis (TCA)
+- Slippage analytics
+- Fill probability model
+- Market impact estimation
+
+### Execution Metrics to Track
+
+- Expected price vs executed price
+- Arrival price slippage
+- VWAP slippage
+- Fill rate
+- Cancel rate
+- Retry rate
+- Cost by liquidity tier
+- Cost by time of day
+- Cost by volatility regime
+
+### Better Alternative
+
+Use:
+
+- Marketable limit orders with smart chasing
+- Participation-based execution for larger orders
+- TWAP/VWAP logic where appropriate
+- Pre-trade cost estimation
+- Order routing awareness
+
+### Risks / Trade-Offs
+
+- More engineering effort
+- Broker API instability
+- More operational failure modes
+
+### Worth Implementing?
+
+**Yes — P0 if going live, P1 if staying paper-only**
+
+---
+
+## Finding 7: Data Infrastructure Needs Stronger Governance
+
+### Current State
+
+The system ingests from:
+
+- Bhavcopy
+- Screener scraping
+- TradingView
+- Macro feeds
+- Fyers
+- Corporate actions sources
+
+It also uses DuckDB and fallback logic.
+
+This is useful, but fragile at scale.
+
+### Weakness
+
+Potential issues:
+
+- Schema drift
+- Missing values
+- Bad unit parsing
+- Stale fundamentals
+- Restatements
+- Corporate action edge cases
+- Duplicate symbols
+- Time zone issues
+- Source outages
+- Scraper breakage
+- Lack of data lineage
+- Lack of point-in-time correctness
+
+### Recommended Improvement
+
+Introduce **Data Contracts**.
+
+Every data source should define:
+
+- Schema
+- Expected ranges
+- Freshness SLA
+- Null policy
+- Retry policy
+- Fallback policy
+- Quarantine policy
+- Reconciliation rules
+
+Use validation tools such as:
+
+- Pandera
+- Great Expectations
+- Pydantic models
+- Custom anomaly checks
+
+### Bitemporal Data Model
+
+For fundamentals and corporate actions, use two time dimensions:
+
+1. **Valid Time** — when the fact became true in the real world
+2. **As-Of Time** — when the system knew it
+
+This prevents look-ahead bias from restatements.
+
+### Better Alternative
+
+Move from “latest data wins” to:
+
+- Immutable event log
+- Point-in-time snapshots
+- Source versioning
+- Hashed data batches
+- Replayable ingestion
+
+### Risks / Trade-Offs
+
+- More storage
+- More engineering complexity
+- Harder debugging initially
+
+### Worth Implementing?
+
+**Yes — P0 / P1 Critical**
+
+---
+
+## Finding 8: DuckDB Is Good for Analytics but May Be Insufficient for Full Production Operations
+
+### Current State
+
+DuckDB is a strong embedded OLAP database and likely works well for research and reconciliation.
+
+### Weakness
+
+For a live trading system, a single embedded database file may create issues:
+
+- Single-writer constraints
+- Lock contention
+- Backup complexity
+- Concurrency limitations
+- Disaster recovery complexity
+- Limited operational tooling
+- Harder horizontal scaling
+
+### Recommended Improvement
+
+Use a hybrid architecture:
+
+- **DuckDB / Parquet** for analytics and research
+- **PostgreSQL** or **SQLite + Postgres** for operational state
+- **Object storage** for immutable logs and model artifacts
+- **Redis / queue** for job coordination
+
+### Better Alternative
+
+If scale remains small:
+
+- Keep DuckDB for analytics
+- Add Postgres for transactional state
+- Add automated backup / restore tests
+
+If scale grows:
+
+- TimescaleDB for time series
+- ClickHouse for large analytical logs
+- Feature store for ML consistency
+
+### Risks / Trade-Offs
+
+- More infrastructure
+- More operational overhead
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 9: The LLM Layer Needs Stronger Guardrails
+
+### Current State
+
+The system uses LLM agents for:
+
+- Bull thesis
+- Bear risks
+- Judge synthesis
+- Conviction scoring
+
+The deterministic risk node is good, but the LLM layer still needs hardening.
+
+### Weakness
+
+LLM systems can suffer from:
+
+- Hallucination
+- Overconfidence
+- Prompt injection
+- Flaky numeric extraction
+- Narrative bias
+- Recency bias
+- Overly persuasive explanations
+- Model drift from prompt changes
+
+### Why this matters
+
+If LLM text influences trade approval, even indirectly, errors can propagate.
+
+### Recommended Improvement
+
+Use **structured outputs only**.
+
+Require agents to return JSON such as:
+
+```json
+{
+  "thesis": "string",
+  "confidence": 0.0,
+  "evidence_refs": ["metric_id", "news_id"],
+  "key_risks": ["risk1", "risk2"],
+  "confidence_interval": [0.0, 0.0],
+  "abstain": false
+}
+```
+
+Then validate with Pydantic.
+
+### Better Alternatives
+
+1. Use LLMs for explanation, not scoring.
+2. Use deterministic scoring for conviction.
+3. Use LLMs only to generate hypotheses.
+4. Use RAG with citations to structured facts.
+5. Use model ensembles and disagreement penalties.
+6. Track Brier scores for each agent.
+7. Weight agents by historical calibration.
+
+### Prompt-Injection Defense
+
+Treat all scraped content as untrusted.
+
+Rules:
+
+- Never allow external text to override system instructions
+- Separate data from instructions
+- Sanitize news / announcement text
+- Reject suspicious instruction-like content
+- Limit tool permissions for LLM nodes
+
+### Risks / Trade-Offs
+
+- More engineering
+- Higher latency
+- More complex evaluation
+
+### Worth Implementing?
+
+**Yes — P0 Important**
+
+---
+
+## Finding 10: Conviction Score Is Probably Too Subjective
+
+### Current State
+
+The Research Judge appears to produce a conviction score, likely parsed from text.
+
+### Weakness
+
+A free-text conviction score is:
+
+- Hard to calibrate
+- Hard to reproduce
+- Prone to prompt sensitivity
+- Prone to hallucination
+- Difficult to audit mathematically
+
+### Recommended Improvement
+
+Replace raw LLM conviction with a **composite deterministic score**.
+
+Example:
+
+\[
+C =
+w_1 \cdot \text{ML Probability}
++ w_2 \cdot \text{Technical Quality}
++ w_3 \cdot \text{Fundamental Quality}
++ w_4 \cdot \text{Regime Fit}
+- w_5 \cdot \text{Trap Risk}
+- w_6 \cdot \text{Liquidity Risk}
+\]
+
+Then use LLM output for:
+
+- Explanation
+- Risk highlighting
+- Edge-case discovery
+- Manual review support
+
+### Better Alternative
+
+Use a **Bayesian evidence accumulator**:
+
+\[
+P(\text{success} \mid \text{evidence}) \propto P(\text{evidence} \mid \text{success}) P(\text{success})
+\]
+
+where each signal contributes an evidence factor.
+
+### Risks / Trade-Offs
+
+- Less “creative” judgment
+- Requires careful weighting
+- Needs historical label data
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 11: Feedback Loop May Overfit to Recent Noise
+
+### Current State
+
+There is a continuous improvement loop and feedback learning concept.
+
+### Weakness
+
+Financial feedback loops are dangerous because:
+
+- Sample sizes are small
+- Regimes change
+- Luck is hard to distinguish from skill
+- Recent outcomes can be misleading
+- Self-training can amplify bias
+
+### Recommended Improvement
+
+Use disciplined learning:
+
+- Champion / challenger models
+- Rolling performance windows with confidence intervals
+- Bayesian priors to prevent overreaction
+- Human review before model promotion
+- Market replay before live deployment
+- Feature-level performance attribution
+- Agent-level skill tracking
+
+### Better Alternative
+
+Use **multi-armed bandit allocation** for strategy variants, but with strong risk caps.
+
+### Risks / Trade-Offs
+
+- Slower adaptation
+- More governance overhead
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 12: Shariah Compliance Needs Better Data Quality and Governance
+
+### Current State
+
+The system implements Shariah rules and purification logs.
+
+### Weakness
+
+Potential weaknesses:
+
+- Fundamental data may be stale
+- Ratios may use inconsistent units
+- Market cap timing may not align with balance sheet timing
+- Sector classification may be wrong
+- Purification calculations may be approximate
+- No formal scholarly review workflow visible
+
+### Recommended Improvement
+
+Create a **Shariah Data Quality Engine**:
+
+- Unit normalization
+- Filing-date alignment
+- Missing-data fail-closed behavior
+- Ratio recomputation from raw statements
+- Audit trail for every rule
+- Override logging with human approval
+- Scholarly sign-off register
+
+### Additional Controls
+
+- Quarterly re-certification
+- Fatwa reference mapping
+- Purification calculation methodology document
+- Independent review of edge cases
+
+### Risks / Trade-Offs
+
+- More operational overhead
+- May reduce eligible universe
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 13: Corporate Action Handling Needs Expansion
+
+### Current State
+
+The system handles splits and bonus issues with adjustment multipliers.
+
+This is good.
+
+### Weakness
+
+It may not fully handle:
+
+- Dividends
+- Rights issues
+- Spin-offs
+- Capital reductions
+- Buybacks
+- Mergers
+- Demergers
+- Suspensions
+- Delistings
+- Face value changes
+- Symbol changes
+- T2T / BE restrictions
+
+### Why this matters
+
+Corporate actions can distort:
+
+- Price history
+- Volume history
+- Fundamental ratios
+- Shariah screening
+- Performance measurement
+- Position valuation
+
+### Recommended Improvement
+
+Build a full **Corporate Action Event Model**.
+
+Include:
+
+- Event type
+- Ex-date
+- Record date
+- Adjustment factor
+- Cash component
+- Rights ratio
+- Suspicious action flag
+- Source evidence
+- Replayable adjustment log
+
+### Better Alternative
+
+Use event-sourced price adjustment rather than one-off multiplier updates.
+
+### Risks / Trade-Offs
+
+- More data engineering
+- More edge cases
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 14: Strategy Universe Is Too Narrow and May Be Fragile
+
+### Current State
+
+The system focuses on:
+
+- Minervini / VCP momentum
+- Mean reversion
+- ML factor scoring
+
+This is reasonable.
+
+### Weakness
+
+The strategy may be over-dependent on:
+
+- Breakout success
+- Bull regimes
+- Liquidity expansion
+- Small/mid-cap momentum persistence
+
+### Recommended Improvement
+
+Add complementary low-correlation signal families:
+
+1. **Earnings quality**
+2. **Piotroski-style fundamental strength**
+3. **Relative strength vs sector**
+4. **Index inclusion / exclusion effects**
+5. **Block deal / bulk deal analysis**
+6. **Delivery volume confirmation**
+7. **Volatility compression breakouts**
+8. **Mean reversion only in range regimes**
+9. **Event-driven signals**
+10. **Risk-off cash allocation models**
+
+### Better Alternative
+
+Move from single-strategy to **multi-strategy allocation** with strategy-level risk budgets.
+
+### Risks / Trade-Offs
+
+- More research burden
+- More monitoring
+- Potential for overfitting
+
+### Worth Implementing?
+
+**Yes — P2 Strategic**
+
+---
+
+## Finding 15: Mean Reversion Logic Is Too Simple
+
+### Current State
+
+Mean reversion appears to rely on RSI oversold logic.
+
+### Weakness
+
+RSI < 30 is a weak standalone signal. It can catch falling knives.
+
+### Recommended Improvement
+
+Upgrade mean reversion to a statistical framework:
+
+- Index-relative z-score
+- Sector-relative mean reversion
+- Cointegration pairs
+- Ornstein-Uhlenbeck half-life estimation
+- Volatility-adjusted entry bands
+- Distress filters
+- Governance filters
+- Liquidity filters
+
+### Better Model
+
+Use:
+
+\[
+z_t = \frac{P_t - \hat{\mu}_t}{\hat{\sigma}_t}
+\]
+
+Enter only if:
+
+- \(z_t\) is extreme
+- trend regime is range-bound
+- no fundamental red flag
+- volume does not indicate distribution
+- liquidity is sufficient
+
+### Risks / Trade-Offs
+
+- More complexity
+- More false signals if poorly tuned
+
+### Worth Implementing?
+
+**Yes — P2 Important**
+
+---
+
+## Finding 16: The System Needs Better Performance Attribution
+
+### Current State
+
+The evaluator calculates metrics like win rate, max drawdown, and Sharpe.
+
+### Weakness
+
+Those metrics do not explain **why** performance happened.
+
+### Recommended Improvement
+
+Add attribution:
+
+- Sector attribution
+- Factor attribution
+- Signal attribution
+- Agent attribution
+- Exit-rule attribution
+- Cost attribution
+- Regime attribution
+- Liquidity-tier attribution
+
+### Questions to Answer
+
+- Is alpha coming from stock selection or market exposure?
+- Are LLM-approved trades better than deterministic-only trades?
+- Does the Bear agent actually improve outcomes?
+- Do partial exits improve utility?
+- Does the Shariah filter improve or reduce risk-adjusted returns?
+- Which liquidity tier produces the best net expectancy?
+
+### Better Alternative
+
+Build a **Post-Trade Attribution Lab**.
+
+### Risks / Trade-Offs
+
+- Requires more data engineering
+- Requires larger sample size
+
+### Worth Implementing?
+
+**Yes — P1 / P2 Important**
+
+---
+
+## Finding 17: Observability Is Probably Insufficient for Production
+
+### Current State
+
+There are scripts and logs, but the repository suggests a script-centric architecture.
+
+### Weakness
+
+Production systems need:
+
+- Metrics
+- Traces
+- Alerts
+- Dashboards
+- Audit logs
+- Data freshness monitoring
+- Model drift monitoring
+- Execution anomaly detection
+- Business KPIs
+
+### Recommended Improvement
+
+Add observability stack:
+
+- Structured logging
+- Metrics collection
+- Alert routing
+- Sentry / error tracking
+- Health endpoints
+- Runbook automation
+- Data SLA dashboards
+- Model performance dashboards
+
+### Key Metrics
+
+- Ingestion freshness
+- Source failure rate
+- Screening pass rate
+- ML calibration error
+- Signal decay
+- Trade rejection reasons
+- Fill slippage
+- P&L by strategy
+- Drawdown state
+- System halt events
+
+### Risks / Trade-Offs
+
+- More infrastructure
+- More maintenance
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 18: Orchestration Should Move Beyond Cron-Style Scripts
+
+### Current State
+
+The system uses multiple scripts for different phases:
+
+- premarket
+- live preview
+- reconciliation
+- sentinel
+- drawdown
+- feedback
+- model training
+
+This works early on but becomes brittle.
+
+### Weakness
+
+Cron-style systems often lack:
+
+- Dependency management
+- Retries with backoff
+- Backfill support
+- Idempotency
+- Failure recovery
+- Observability
+- SLA tracking
+
+### Recommended Improvement
+
+Use an orchestrator:
+
+- Prefect
+- Dagster
+- Airflow
+- Temporal
+- Or a lightweight internal DAG runner
+
+### Requirements
+
+- Idempotent tasks
+- Retry policies
+- Alerting
+- Backfill
+- Environment separation
+- Audit logs
+- Manual override hooks
+
+### Risks / Trade-Offs
+
+- More setup effort
+- More operational complexity
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 19: Security Needs Stronger Controls
+
+### Current State
+
+The repository includes security-auditing roles and processes.
+
+### Weakness
+
+Still likely missing:
+
+- Secret rotation
+- Runtime secret isolation
+- Scraper input sanitization
+- LLM prompt-injection protection
+- Dependency vulnerability scanning
+- Immutable audit logging
+- Least-privilege API keys
+- Backup encryption
+- Disaster recovery testing
+
+### Recommended Improvement
+
+Implement:
+
+1. Secrets manager
+2. Dependency scanning
+3. Static security analysis
+4. Prompt injection defenses
+5. Signed model artifacts
+6. Immutable trade decision logs
+7. Role-based access controls
+8. Backup restore drills
+9. API key scoping
+10. Network egress allowlist
+
+### Risks / Trade-Offs
+
+- More operational overhead
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## Finding 20: Legal, Data Licensing, and Compliance Risks Are Underexplored
+
+### Current State
+
+The system scrapes or pulls from multiple external sources.
+
+### Weakness
+
+Potential issues:
+
+- Terms-of-service violations
+- Data licensing ambiguity
+- Scraping fragility
+- Regulatory constraints
+- Financial advice risk
+- Shariah certification risk
+- Broker API usage restrictions
+
+### Recommended Improvement
+
+Create a **Data Source Compliance Register**:
+
+| Source | Purpose | Licensing | ToS Risk | Fallback | Retention | Reliability |
+|---|---|---:|---:|---|---:|---:|
+
+Also add:
+
+- Disclaimer framework
+- User consent flow
+- No-advice positioning
+- Audit log for compliance-critical decisions
+
+### Risks / Trade-Offs
+
+- May require paid data sources
+- May reduce scraping convenience
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+# 3. New Approaches That Could Be Considered
+
+This section goes beyond incremental fixes.
+
+---
+
+## 3.1 Conformal Prediction for Trade Confidence
+
+### Idea
+
+Instead of saying:
+
+> ML probability = 0.62
+
+Use conformal prediction to produce statistically valid uncertainty sets.
+
+### Benefit
+
+You can say:
+
+> With 90% coverage, the expected return lies in this interval.
+
+This allows:
+
+- Better abstention
+- Better sizing
+- Better risk control
+
+### Why it may be better
+
+- More honest uncertainty
+- Less overconfidence
+- Better selective trading
+
+### Trade-Offs
+
+- More statistical complexity
+- Requires calibration discipline
+
+### Worth Implementing?
+
+**Yes — High Value**
+
+---
+
+## 3.2 Triple-Barrier Labeling Instead of Simple 5-Day Return
+
+### Idea
+
+Current target may be too simple.
+
+Use triple-barrier labeling:
+
+- Profit target barrier
+- Stop-loss barrier
+- Time expiration barrier
+
+Then train models to predict realistic trade outcomes under actual risk rules.
+
+### Benefit
+
+The model learns:
+
+- Not just “price goes up”
+- But “does this trade survive stops and reach target within time?”
+
+### Why it may be better
+
+- Aligns ML with actual trading logic
+- More realistic labels
+- Better integration with risk engine
+
+### Trade-Offs
+
+- More complex labeling
+- Requires careful parameterization
+
+### Worth Implementing?
+
+**Yes — High Value**
+
+---
+
+## 3.3 Meta-Labeling
+
+### Idea
+
+Use a primary signal generator to find candidates, then a secondary model to decide whether the candidate should be traded.
+
+Primary model:
+
+- Finds setups
+
+Secondary model:
+
+- Estimates probability that the setup succeeds after costs and risk rules
+
+### Benefit
+
+Separates:
+
+- Signal discovery
+- Trade approval
+
+### Why it may be better
+
+- More modular
+- More robust
+- Easier to improve independently
+
+### Trade-Offs
+
+- More modeling complexity
+
+### Worth Implementing?
+
+**Yes — High Value**
+
+---
+
+## 3.4 Hierarchical Risk Parity
+
+### Idea
+
+Instead of equal-weight or simple risk sizing, cluster assets and allocate risk hierarchically.
+
+### Benefit
+
+Reduces concentration and improves diversification without requiring precise return forecasts.
+
+### Why it may be better
+
+- More robust than mean-variance
+- Less sensitive to estimation error
+- Good for correlated momentum names
+
+### Trade-Offs
+
+- Less aggressive alpha seeking
+- Needs covariance estimation
+
+### Worth Implementing?
+
+**Yes — Medium/High Value**
+
+---
+
+## 3.5 Regime Detection Beyond Moving Averages
+
+### Idea
+
+Current regime detection may use moving averages and VIX-like thresholds.
+
+Better methods:
+
+- Hidden Markov Models
+- Bayesian online changepoint detection
+- Markov-switching models
+- Volatility regime clustering
+- Macro nowcasting
+
+### Benefit
+
+Improves:
+
+- Cash allocation
+- Risk exposure
+- Strategy selection
+
+### Why it may be better
+
+- More adaptive
+- Less arbitrary than fixed thresholds
+
+### Trade-Offs
+
+- Risk of overfitting
+- More model risk
+
+### Worth Implementing?
+
+**Yes — P2 Strategic**
+
+---
+
+## 3.6 Event-Driven Layer
+
+### Idea
+
+Add event signals:
+
+- Earnings surprises
+- Board announcements
+- Index inclusion/exclusion
+- Block deals
+- Bulk deals
+- Buybacks
+- Pledge changes
+- Governance red flags
+- Insider activity where available
+
+### Benefit
+
+Can create alpha independent of pure technicals.
+
+### Why it may be better
+
+- More diverse signal base
+- Better trap detection
+- Better fundamental timing
+
+### Trade-Offs
+
+- Data complexity
+- Legal / ToS issues
+- Requires NLP / parsing
+
+### Worth Implementing?
+
+**Yes — P2 Strategic**
+
+---
+
+## 3.7 LLM-Based Structured Research, Not LLM-Based Conviction
+
+### Idea
+
+Use LLMs for:
+
+- Summarizing filings
+- Detecting risk language
+- Extracting structured events
+- Generating hypotheses
+- Explaining decisions
+
+But not for raw trade conviction.
+
+### Benefit
+
+Keeps LLM usefulness while reducing hallucination risk.
+
+### Why it may be better
+
+- Safer
+- More auditable
+- More scalable
+
+### Trade-Offs
+
+- Less “autonomous” feeling
+
+### Worth Implementing?
+
+**Yes — High Value**
+
+---
+
+## 3.8 Feature Store
+
+### Idea
+
+Maintain a single source of truth for feature definitions used in:
+
+- Training
+- Backtesting
+- Live inference
+- Monitoring
+
+### Benefit
+
+Prevents training-serving skew.
+
+### Why it may be better
+
+- Improves reliability
+- Reduces silent bugs
+- Makes audits easier
+
+### Trade-Offs
+
+- More infrastructure
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## 3.9 Model Registry and Champion/Challenger Pipeline
+
+### Idea
+
+Every model version should have:
+
+- Training data hash
+- Feature schema
+- Metrics
+- Calibration report
+- Backtest report
+- Approval status
+- Rollback path
+
+### Benefit
+
+Prevents accidental promotion of bad models.
+
+### Why it may be better
+
+- Safer
+- More reproducible
+- Easier governance
+
+### Trade-Offs
+
+- More process overhead
+
+### Worth Implementing?
+
+**Yes — P1 Important**
+
+---
+
+## 3.10 Digital Twin / Market Replay Engine
+
+### Idea
+
+Replay historical market states through the full pipeline:
+
+- Data ingestion
+- Screening
+- Debate
+- Risk
+- Execution
+
+Then compare outcomes.
+
+### Benefit
+
+Allows safe testing of:
+
+- New models
+- New prompts
+- New thresholds
+- New execution logic
+
+### Why it may be better
+
+- More realistic than static backtests
+- Reveals pipeline-level issues
+
+### Trade-Offs
+
+- Engineering complexity
+
+### Worth Implementing?
+
+**Yes — P2 High Value**
+
+---
+
+# 4. Comparison of Current Approach vs Better Alternatives
+
+| Domain | Current Approach | Weakness | Better Alternative | Why Better | Worth It? |
+|---|---|---:|---|---|---|
+| Backtesting | Time split, basic metrics | Overfitting, cost blindness | Purged walk-forward, deflated Sharpe | More realistic | Yes |
+| ML Target | Simple forward return | Ignores risk rules | Triple-barrier labels | Aligns with trading reality | Yes |
+| ML Threshold | Fixed probability cutoff | Arbitrary | Calibrated selective prediction | Better risk-adjusted decisions | Yes |
+| Sizing | Risk arbiter per trade | Ignores covariance | Portfolio optimizer / risk budgeting | Better portfolio risk | Yes |
+| Risk | Stops, caps, drawdown breaker | Missing tail risk | CVaR, stress tests, vol targeting | Better crash protection | Yes |
+| Execution | Paper fills | Unrealistic | TCA + partial-fill simulation | Live readiness | Yes |
+| Data | Scrapers + DuckDB | Fragile, non-point-in-time | Data contracts + bitemporal store | Less leakage, more trust | Yes |
+| LLM | Debate conviction | Hallucination risk | Structured outputs + deterministic scoring | Safer, more auditable | Yes |
+| Feedback | Learning loop | Overfit to noise | Champion/challenger + priors | Safer adaptation | Yes |
+| Shariah | Rule engine | Data quality risk | Scholar-governed data pipeline | Higher trust | Yes |
+| Ops | Scripts/cron | Brittle | Orchestrator + observability | More reliable | Yes |
+
+---
+
+# 5. Rechecking Previous Audit Findings and Assumptions
+
+The previous audit appears to have correctly identified many important issues, such as:
+
+- Fail-closed behavior when model is missing
+- Insufficient data handling
+- Second opinion gate enforcement
+- Position sizing misuse
+- Corporate action math
+- Shariah edge cases
+- Lookback truncation issues
+- Feature alignment problems
+- Reconciliation gaps
+
+Many of those findings remain valid.
+
+However, some assumptions need to be revisited.
+
+---
+
+## 5.1 Assumption: Fixing Code Flaws Is Enough
+
+### Reassessment
+
+Not enough.
+
+The bigger future risk is not syntax-level bugs. It is:
+
+- Statistical overfitting
+- Bad labels
+- Poor calibration
+- Data leakage
+- Execution gap
+- Operational failure
+
+### Verdict
+
+Previous code remediation was necessary but insufficient.
+
+---
+
+## 5.2 Assumption: XGBoost with Monotonic Constraints Is Sufficiently Robust
+
+### Reassessment
+
+Monotonic constraints are useful, but they do not guarantee:
+
+- Economic validity
+- Calibration
+- Regime robustness
+- Resistance to feature drift
+- Live profitability
+
+### Verdict
+
+Still useful, but should be augmented with calibration and drift monitoring.
+
+---
+
+## 5.3 Assumption: Conviction >= 7.0 and ML > 0.50 Is a Good Gate
+
+### Reassessment
+
+This gate is plausible but probably arbitrary.
+
+It should be replaced or augmented by:
+
+- Calibrated expected utility
+- Cost-aware thresholds
+- Regime-dependent thresholds
+- Uncertainty-aware abstention
+
+### Verdict
+
+No longer sufficient as a primary gate.
+
+---
+
+## 5.4 Assumption: Partial Exit at Target 1 Is Automatically Better
+
+### Reassessment
+
+Partial exits can reduce variance, but they may also reduce expectancy if the strategy has fat-tailed winners.
+
+This must be tested empirically.
+
+### Verdict
+
+Needs cost-aware utility analysis, not assumed best practice.
+
+---
+
+## 5.5 Assumption: Paper Trading Is Enough Before Live
+
+### Reassessment
+
+Paper trading is necessary but not sufficient.
+
+It often fails to capture:
+
+- Queue position
+- Partial fills
+- Market impact
+- Latency
+- Circuit-limit behavior
+- Broker instability
+
+### Verdict
+
+Need market replay and TCA before live.
+
+---
+
+# 6. What Was Probably Missed Previously
+
+These are areas that seem underemphasized in prior reviews.
+
+---
+
+## 6.1 Calibration Was Underweighted
+
+The system focuses heavily on gates and scores, but not enough on whether those scores are statistically meaningful.
+
+### Missing Elements
+
+- Reliability diagrams
+- ECE tracking
+- Calibration by regime
+- Calibration by sector / liquidity tier
+
+---
+
+## 6.2 Portfolio Construction Was Underweighted
+
+The system appears trade-centric rather than portfolio-centric.
+
+### Missing Elements
+
+- Covariance modeling
+- Factor concentration
+- Risk contribution caps
+- Turnover penalties
+- Portfolio utility optimization
+
+---
+
+## 6.3 Prompt Injection Was Underweighted
+
+If LLM agents consume scraped web content, announcements, or news, they can be manipulated by adversarial text.
+
+### Missing Elements
+
+- Input sanitization
+- Instruction-data separation
+- Tool permission boundaries
+- Structured output validation
+
+---
+
+## 6.4 Point-in-Time Data Governance Was Underweighted
+
+This is one of the largest hidden risks in quant systems.
+
+### Missing Elements
+
+- Bitemporal modeling
+- Filing-date awareness
+- Restatement handling
+- Source lineage
+
+---
+
+## 6.5 Model Drift and Strategy Decay Monitoring Were Underweighted
+
+A model can degrade silently.
+
+### Missing Elements
+
+- PSI / KL drift detection
+- Calibration drift alerts
+- Performance decay control charts
+- Auto de-risking triggers
+
+---
+
+## 6.6 Live Microstructure Risk Was Underweighted
+
+The current design appears mostly EOD-centric.
+
+### Missing Elements
+
+- Intraday risk monitoring
+- Circuit-limit behavior
+- Order-book stress
+- Fill probability modeling
+
+---
+
+# 7. Proposed Improvement Roadmap
+
+This section separates initiatives by priority.
+
+---
+
+## Phase 0 — Immediate Safety & Validation Improvements
+
+**Timeline:** 0–2 weeks  
+**Goal:** Reduce the most dangerous blind spots.
+
+### Recommended Actions
+
+1. Add transaction-cost model to backtests
+2. Add calibration report for ML probabilities
+3. Add structured JSON outputs for LLM agents
+4. Add deterministic fact validation for LLM outputs
+5. Add backup and restore testing for DuckDB / state files
+6. Add data quality checks for ingestion
+7. Add execution slippage logging
+8. Add model uncertainty / abstention logic
+9. Add prompt-injection guardrails
+10. Add disaster recovery checklist
+
+### Expected Impact
+
+- Safer
+- More trustworthy
+- Less likely to be fooled by backtests
+
+---
+
+## Phase 1 — Quant Rigor and Production Hardening
+
+**Timeline:** 2–6 weeks  
+**Goal:** Make the system statistically and operationally stronger.
+
+### Recommended Actions
+
+1. Implement purged walk-forward validation
+2. Implement triple-barrier labeling
+3. Build feature store or feature registry
+4. Build model registry
+5. Add portfolio-level risk modeling
+6. Add CVaR / stress tests
+7. Add drift monitoring
+8. Add orchestrator
+9. Add observability dashboards
+10. Add TCA reporting
+
+### Expected Impact
+
+- Better live readiness
+- Better risk control
+- Better reproducibility
+- Better scalability
+
+---
+
+## Phase 2 — Strategic Alpha and Architecture Upgrades
+
+**Timeline:** 1–3 months  
+**Goal:** Improve edge and robustness.
+
+### Recommended Actions
+
+1. Add regime detection
+2. Add event-driven signals
+3. Add multi-strategy allocation
+4. Add HRP or robust portfolio optimization
+5. Add market replay engine
+6. Add Shariah governance workflow
+7. Add advanced mean reversion models
+8. Add attribution lab
+
+### Expected Impact
+
+- More diversified alpha
+- Better drawdown behavior
+- More institutional-grade architecture
+
+---
+
+## Phase 3 — Advanced Research Only
+
+**Timeline:** 3+ months  
+**Goal:** Explore higher-complexity methods without endangering core system.
+
+### Possible Initiatives
+
+1. Genetic programming alpha factory
+2. Reinforcement learning execution
+3. Options-based hedging
+4. Bayesian deep ensembles
+5. Alternative data ingestion
+6. Autonomous strategy discovery
+
+### Warning
+
+These should be treated as research, not core production dependencies.
+
+---
+
+# 8. Which Improvements Are Worth Implementing?
+
+## 8.1 Definitely Worth Implementing
+
+| Improvement | Reason | Priority |
+|---|---|---:|
+| Cost-aware backtesting | Prevents false alpha | P0 |
+| ML calibration | Prevents overconfidence | P0 |
+| Structured LLM outputs | Reduces hallucination | P0 |
+| Data quality contracts | Prevents garbage-in decisions | P0 |
+| Backup / restore testing | Prevents catastrophic loss | P0 |
+| Portfolio risk budgeting | Reduces correlated blowups | P0/P1 |
+| Drift monitoring | Detects silent decay | P1 |
+| Orchestrator | Reduces operational brittleness | P1 |
+| Model registry | Prevents bad model promotion | P1 |
+| Shariah data governance | Improves trust and compliance | P1 |
+
+---
+
+## 8.2 Worth Implementing After Core Stabilization
+
+| Improvement | Reason | Priority |
+|---|---|---:|
+| Regime detection | Better risk-off behavior | P2 |
+| Event-driven signals | More diverse alpha | P2 |
+| Market replay engine | Better live readiness | P2 |
+| Advanced mean reversion | Better signal diversity | P2 |
+| Attribution lab | Better learning | P2 |
+| HRP optimizer | More robust allocation | P2 |
+
+---
+
+## 8.3 Not Worth Implementing Right Now
+
+| Idea | Why Not |
+|---|---|
+| Full microservices architecture | Overkill for current scale |
+| Kubernetes | Too much operational overhead |
+| High-frequency trading | Requires infrastructure not present |
+| RL-based position sizing in live | Too risky without robust simulator |
+| Autonomous strategy generation in production | High overfitting risk |
+| Exotic alternative data before core validation | Costly and distracting |
+| Blockchain-based audit trail | Unnecessary complexity |
+| Heavy real-time deep learning inference | Latency and reliability risk |
+
+---
+
+# 9. Recommended Target Architecture
+
+The system should evolve toward a **modular, event-driven, research-to-production platform**.
+
+## Proposed High-Level Architecture
+
+```text
+[Ingestion Layer]
+  ├─ Market Data
+  ├─ Fundamentals
+  ├─ Corporate Actions
+  ├─ News / Announcements
+  └─ Macro Feeds
+        │
+        ▼
+[Data Quality Layer]
+  ├─ Schema Validation
+  ├─ Freshness Checks
+  ├─ Outlier Detection
+  ├─ Reconciliation
+  └─ Quarantine / Dead Letter Queue
+        │
+        ▼
+[Point-in-Time Store]
+  ├─ Operational DB
+  ├─ Analytical Store / Parquet
+  └─ Feature Store
+        │
+        ▼
+[Research Layer]
+  ├─ Backtester
+  ├─ Walk-Forward Engine
+  ├─ Cost Model
+  ├─ Labeling Engine
+  └─ Experiment Registry
+        │
+        ▼
+[Model Layer]
+  ├─ Model Training
+  ├─ Calibration
+  ├─ Validation Gates
+  ├─ Model Registry
+  └─ Champion / Challenger
+        │
+        ▼
+[Decision Layer]
+  ├─ Screening
+  ├─ Risk Rules
+  ├─ Shariah Rules
+  ├─ ML Scoring
+  ├─ LLM Advisory Layer
+  └─ Deterministic Arbiter
+        │
+        ▼
+[Portfolio Construction]
+  ├─ Optimizer
+  ├─ Risk Budgeting
+  ├─ Cash Allocation
+  └─ Turnover Control
+        │
+        ▼
+[Execution Layer]
+  ├─ Order Management
+  ├─ Smart Order Routing
+  ├─ Fill Simulation
+  ├─ TCA
+  └─ Reconciliation
+        │
+        ▼
+[Monitoring & Governance]
+  ├─ Drift Monitoring
+  ├─ Performance Attribution
+  ├─ Alerting
+  ├─ Audit Logs
+  └─ Human Override
+```
+
+---
+
+# 10. Recommended Quantitative Metrics to Track
+
+The system should not only track P&L. It should track a fuller metric suite.
+
+## 10.1 Strategy Metrics
+
+- Net Sharpe after costs
+- Sortino
+- Calmar
+- Omega
+- Profit factor
+- Expectancy per trade
+- Average R
+- Tail ratio
+- Maximum adverse excursion
+- Maximum favorable excursion
+- Turnover
+- Capacity estimate
+
+## 10.2 Model Metrics
+
+- Log loss
+- Brier score
+- AUC-PR
+- Calibration slope
+- Expected Calibration Error
+- PSI drift
+- Feature importance stability
+- Live vs backtest divergence
+
+## 10.3 Execution Metrics
+
+- Slippage vs arrival price
+- Slippage vs VWAP
+- Fill rate
+- Partial fill rate
+- Cancel rate
+- Market impact estimate
+- Cost by liquidity tier
+
+## 10.4 Risk Metrics
+
+- Portfolio VaR
+- CVaR
+- Stress loss
+- Sector concentration
+- Factor concentration
+- Beta exposure
+- Correlation stress
+- Drawdown velocity
+
+## 10.5 Operational Metrics
+
+- Ingestion latency
+- Data freshness
+- Pipeline failure rate
+- LLM timeout rate
+- Reconciliation breaks
+- Alert noise rate
+- Backup success rate
+
+---
+
+# 11. Specific High-Value Experiments to Run
+
+These experiments would help determine which improvements actually matter.
+
+---
+
+## Experiment 1: Cost-Aware Backtest vs Current Backtest
+
+### Objective
+
+Measure how much alpha survives after realistic costs.
+
+### Method
+
+- Run existing backtest
+- Add cost model
+- Compare net Sharpe, max DD, expectancy
+
+### Success Criterion
+
+Strategy remains economically meaningful after costs.
+
+---
+
+## Experiment 2: Calibrated ML Gate vs Fixed 0.50 Threshold
+
+### Objective
+
+Test whether calibrated probabilities improve precision.
+
+### Method
+
+- Train calibration layer
+- Compare trade count, win rate, net expectancy
+
+### Success Criterion
+
+Higher expected utility per trade or better drawdown profile.
+
+---
+
+## Experiment 3: Portfolio Optimizer vs Current Sizing
+
+### Objective
+
+Test whether portfolio-level sizing improves risk-adjusted returns.
+
+### Method
+
+- Simulate current sizing
+- Simulate volatility-targeted / risk-budgeted sizing
+- Compare correlation-adjusted drawdowns
+
+### Success Criterion
+
+Lower tail risk without destroying expectancy.
+
+---
+
+## Experiment 4: LLM Structured Output vs Regex Conviction Parsing
+
+### Objective
+
+Reduce prompt sensitivity and hallucination.
+
+### Method
+
+- Force JSON schema
+- Validate all numeric fields
+- Compare stability across prompt perturbations
+
+### Success Criterion
+
+More stable and auditable decision inputs.
+
+---
+
+## Experiment 5: Regime Filter Enhancement
+
+### Objective
+
+Improve risk-off behavior.
+
+### Method
+
+- Compare DMA/VIX filter
+- Compare HMM or changepoint regime filter
+- Evaluate drawdown and missed opportunity cost
+
+### Success Criterion
+
+Better risk-adjusted outcomes, not just fewer trades.
+
+---
+
+# 12. Final Critical Assessment
+
+## What the system is today
+
+A promising, audit-aware, semi-autonomous paper-trading research platform with strong guardrails and interesting multi-agent design.
+
+## What the system is not yet
+
+A fully institutional-grade, live-capital-ready, statistically validated, execution-aware, portfolio-optimized trading platform.
+
+## The biggest risk
+
+Not a simple software bug.
+
+The biggest risk is:
+
+> **Overconfidence in a system whose backtests, scores, and gates have not been sufficiently validated under realistic market frictions.**
+
+---
+
+# 13. Final Recommendation
+
+The system should absolutely continue, but the next phase should focus less on adding more indicators and more on:
+
+1. **Statistical truthfulness**
+2. **Cost realism**
+3. **Calibration**
+4. **Portfolio-level risk**
+5. **Execution realism**
+6. **Data governance**
+7. **LLM guardrails**
+8. **Operational observability**
+
+## Top 10 Highest-ROI Improvements
+
+1. Cost-aware walk-forward backtesting  
+2. ML calibration and selective prediction  
+3. Structured LLM outputs with validation  
+4. Portfolio-level risk budgeting  
+5. Transaction-cost and slippage modeling  
+6. Bitemporal point-in-time data model  
+7. Model drift monitoring  
+8. Execution / TCA engine  
+9. Orchestrator and observability  
+10. Shariah data governance and purification audit trail  
+
+---
+
+# 14. Bottom Line
+
+The current system is **already better than most retail quant designs**, but it is not yet optimal.
+
+The most valuable improvements are not exotic. They are foundational:
+
+- Make the backtests more honest.
+- Make the probabilities more calibrated.
+- Make the risk portfolio-aware.
+- Make the data point-in-time.
+- Make the LLM layer structured and safe.
+- Make execution realistic.
+- Make operations observable.
+
+If those are done well, the system can move from “interesting autonomous trading prototype” to a genuinely robust decision-support and paper-trading platform.
+
+If they are not done, the system risks looking strong in backtests and dashboards while remaining fragile under real market conditions.
+
+---
+
+**End of Report**
+
+### USER
+Reanalyze all the things once again with a team of specialezed and relevant agents.
+
+### ASSISTANT
+Save as: `.agency/active/engineering/35_multi_agent_reanalysis_and_system_improvement_report.md`
+
+---
+
+# Multi-Agent Reanalysis: AlphaSentinel System Improvement Report
+
+**Document Type:** Multi-Agent System Reanalysis & Improvement Recommendation  
+**Method:** Reanalysis through specialized agent perspectives: Quant Research, ML Model Risk, Portfolio Risk, Execution Microstructure, Data Engineering, Shariah Compliance, LLM/AI Safety, Security, SRE, Legal/Compliance, Finance/Accounting, Human Factors, and Red Team.  
+**Objective:** Recheck the entire system again, challenge prior assumptions, and identify meaningful improvements that may have been missed.  
+**Posture:** Adversarial and critical. Do not assume the current system is optimal.
+
+---
+
+## Executive Summary
+
+The specialized-agent reanalysis confirms that AlphaSentinel is already significantly more sophisticated than a typical retail trading system. It has strong architectural instincts: deterministic risk authority, Shariah controls, multi-agent debate, reconciliation, circuit breakers, DuckDB write-queue discipline, and a mature audit-driven development process.
+
+However, the reanalysis also finds that the system is **not yet robust enough for live-capital operation** and can be materially improved in several areas that were underweighted in previous reviews.
+
+### The highest-risk weaknesses
+
+1. **Backtest and research validation is not strong enough statistically.**
+2. **Transaction costs, slippage, and market impact are not modeled deeply enough.**
+3. **ML probabilities and conviction scores are not sufficiently calibrated.**
+4. **Risk management is trade-centric, not fully portfolio-centric.**
+5. **Execution realism is insufficient for live market conditions.**
+6. **Data governance and point-in-time correctness need major hardening.**
+7. **LLM debate layer needs stricter structured output and prompt-injection controls.**
+8. **Operational observability, backup/restore, and orchestration need production upgrades.**
+9. **Shariah compliance depends heavily on scraped fundamentals and needs stronger auditability.**
+10. **The feedback loop may overreact to small-sample outcomes unless statistically controlled.**
+
+### The most valuable new improvement opportunities
+
+- **Cost-aware walk-forward backtesting**
+- **Probability calibration and conformal abstention**
+- **Triple-barrier / meta-labeling for ML**
+- **Portfolio-level risk budgeting and covariance-aware sizing**
+- **Bitemporal point-in-time data model**
+- **Structured LLM outputs with deterministic fact-checking**
+- **Execution fill model and Transaction Cost Analysis**
+- **Model registry and champion/challenger governance**
+- **Data contracts and source reconciliation**
+- **Security hardening for Telegram, Streamlit, scraping, and LLM inputs**
+
+### Overall verdict
+
+> The system is promising, architecturally thoughtful, and ahead of most retail quant projects.  
+> But it is still too fragile statistically, operationally, and executionally to be considered live-capital ready without a focused P0/P1 hardening phase.
+
+---
+
+# 1. Specialized Agent Team Used for Reanalysis
+
+The following specialized perspectives were applied to the system.
+
+| Agent Role | Primary Focus |
+|---|---|
+| Quant Research Auditor | Backtesting, alpha validity, lookahead, survivorship, costs |
+| Statistical Validation Agent | Overfitting, multiple testing, confidence intervals, calibration |
+| ML Model Risk Auditor | XGBoost, feature drift, model registry, train/serve skew |
+| Portfolio Risk Officer | Correlation, concentration, tail risk, drawdown, sizing |
+| Execution & Microstructure Auditor | Slippage, fills, circuit limits, TCA, order state |
+| Data Engineering Auditor | DuckDB, ingestion, point-in-time, schema contracts, lineage |
+| Shariah & Financial Statement Auditor | Ratio integrity, purification, scholarly governance |
+| LLM/AI Safety Auditor | Hallucination, prompt injection, structured outputs, agent calibration |
+| Security Red Team | Secrets, authentication, dependency risk, injection, kill-switch abuse |
+| SRE / DevOps Auditor | Cron, orchestration, observability, backup, retries, recovery |
+| Legal & Compliance Auditor | Scraping, ToS, advice risk, regulatory exposure |
+| Finance & Accounting Auditor | P&L ledger, TWR/MWR, taxes, dividends, purification accounting |
+| Human Factors Auditor | Overrides, alert fatigue, sign-off, decision hygiene |
+| Devil’s Advocate / Master Critic | Challenge assumptions and identify hidden failure modes |
+
+---
+
+# 2. What Is Already Good
+
+The team agrees that several design choices are genuinely strong and should be preserved.
+
+## 2.1 Deterministic Risk Arbiter Has Correct Primacy
+
+The system explicitly states:
+
+> LLMs possess zero capital allocation authority. Position sizing, stop-loss, and sector limits are calculated by deterministic Python modules.
+
+This is the correct architecture.
+
+### Why it is good
+
+- Prevents LLM hallucination from directly controlling capital
+- Makes risk behavior reproducible
+- Enables mathematical testing
+- Reduces operational and legal risk
+
+### Team verdict
+
+**Preserve and strengthen.** Do not allow LLM conviction to override deterministic risk.
+
+---
+
+## 2.2 Risk Gate Before LLM Debate Is Cost-Effective
+
+The debate graph routes through deterministic risk first and only proceeds to Bull/Bear/Judge if risk passes.
+
+### Why it is good
+
+- Saves LLM API costs
+- Prevents unnecessary debate on invalid setups
+- Creates a clean fail-fast architecture
+
+### Team verdict
+
+**Excellent pattern.** Keep it.
+
+---
+
+## 2.3 DuckDB Write Queue and Lock Discipline Is Mature
+
+The system uses:
+
+- A single-writer FIFO queue daemon
+- Portalocker-based concurrency guards
+- Read-only connection handling
+- WAL detection fallback
+
+This is better than most embedded-DB implementations.
+
+### Why it is good
+
+- Reduces DuckDB lock crashes
+- Makes cron jobs safer
+- Shows awareness of concurrency constraints
+
+### Team verdict
+
+**Good foundation**, but still not enough for production-grade disaster recovery.
+
+---
+
+## 2.4 Shariah Screening and Purification Are Meaningful Differentiators
+
+The system includes:
+
+- Shariah filter
+- Purification report generation
+- Audit-ready donation statement intent
+
+### Why it is good
+
+- Creates a defensible niche
+- Encourages stronger data discipline
+- Provides ethical/compliance value
+
+### Team verdict
+
+**Strong differentiator**, but requires much stronger data governance and scholarly sign-off.
+
+---
+
+## 2.5 Anti-Trap Shield and Promoter Pledge Tracking Are Valuable
+
+The presence of:
+
+- Anti-trap shield
+- Promoter pledge history
+- Delisted stocks tracking
+- Survivorship bias guard
+
+is impressive.
+
+### Why it is good
+
+- Reduces obvious governance traps
+- Shows awareness of Indian-market risks
+- Helps avoid low-quality breakouts
+
+### Team verdict
+
+**Keep and expand**, especially with event-driven triggers.
+
+---
+
+## 2.6 Reconciliation, Drawdown Circuit Breaker, and Sentinel Are Strong Safety Elements
+
+The system includes:
+
+- Monthly drawdown circuit breaker at 6%
+- EOD reconciliation
+- Sentinel monitoring
+- Paper trading mode
+- Shadow mode
+
+### Why it is good
+
+- Encourages safe shutdown
+- Reduces silent failure
+- Supports staged validation
+
+### Team verdict
+
+**Strong base**, but needs more portfolio-level tail-risk controls.
+
+---
+
+# 3. Agent-by-Agent Findings and Recommendations
+
+---
+
+## Agent 1: Quant Research Auditor
+
+### Verdict
+
+> The research process is too optimistic and statistically fragile.
+
+### Key Findings
+
+#### 3.1.1 Static 50% Out-of-Sample Split Is Insufficient
+
+The backtest harness appears to use a simple 50% chronological split.
+
+This is better than random splitting, but still weak because:
+
+- It does not test regime stability
+- It does not produce confidence intervals
+- It does not handle multiple testing
+- It may overfit to one market phase
+
+#### 3.1.2 VIX Overlay Threshold Is Arbitrary
+
+Using:
+
+- `VIX > 22` → force signal to zero
+
+is a reasonable heuristic, but not optimized or validated.
+
+#### 3.1.3 Universe Is Hardcoded and Likely Suffers From Survivorship
+
+The repository contains a hardcoded NIFTY-style universe. Even if stratified across large/mid/small caps, it is likely based on current or recent constituents.
+
+This creates survivorship bias.
+
+#### 3.1.4 Benchmark and VIX Data From yfinance Is Fragile
+
+Using `^NSEI` and `^INDIAVIX` through yfinance is acceptable for research but weak for production.
+
+Risks:
+
+- Missing days
+- Corporate action adjustments
+- Inconsistent index values
+- Source instability
+
+#### 3.1.5 Genetic Programming Alpha Factory Is High-Risk
+
+The alpha factory idea is interesting, but GP can easily discover:
+
+- Overfit formulas
+- Data-mined anomalies
+- Non-robust patterns
+
+Even with parsimony penalty and Spearman objective, multiple testing risk is severe.
+
+### Recommendations
+
+1. Replace static split with **walk-forward validation**.
+2. Add **purged k-fold** and **embargo periods**.
+3. Add **transaction costs and slippage** directly into backtest objective.
+4. Use **point-in-time universe membership**.
+5. Track:
+   - Deflated Sharpe Ratio
+   - Probability of Backtest Overfitting
+   - Bootstrap confidence intervals
+   - Regime-specific performance
+6. Replace simple forward-return target with:
+   - Triple-barrier labels
+   - Risk-adjusted labels
+   - Cross-sectional rank labels
+7. Treat GP Alpha Factory as research-only until strict validation exists.
+
+### Why This Is Better
+
+It reduces the chance of deploying strategies that only look good because of:
+
+- Data leakage
+- Survivorship
+- Luck
+- Cost-blind assumptions
+
+### Priority
+
+**P0**
+
+---
+
+## Agent 2: Statistical Validation Agent
+
+### Verdict
+
+> The system needs stronger uncertainty quantification before trusting its signals.
+
+### Key Findings
+
+#### 3.2.1 No Clear Evidence of Calibration
+
+The system uses ML probability and conviction scores, but there is little evidence of:
+
+- Reliability diagrams
+- Expected Calibration Error
+- Brier score tracking
+- Calibration by regime or liquidity tier
+
+#### 3.2.2 Fixed Probability Threshold Is Likely Suboptimal
+
+A threshold like:
+
+- ML probability > 0.50
+
+assumes symmetric costs and calibrated probabilities.
+
+Both assumptions are risky.
+
+#### 3.2.3 Win-Rate Feedback Can Be Misleading
+
+The feedback loop appears to warn when win-rate is below 40%.
+
+Win-rate alone is dangerous because:
+
+- A low win-rate strategy can still be profitable
+- A high win-rate strategy can still have fat-tail losses
+- Small samples create false signals
+
+#### 3.2.4 Agent Memory Uses Short-Horizon Outcomes
+
+The agent memory table tracks `outcome_3d_pct`.
+
+This is useful but noisy. It may encourage overreaction to short-term outcomes.
+
+### Recommendations
+
+1. Add **probability calibration**:
+   - Platt scaling
+   - Isotonic regression
+   - Beta calibration
+2. Add **conformal prediction** for uncertainty-aware abstention.
+3. Replace win-rate-only feedback with:
+   - Expectancy per trade
+   - Profit factor
+   - Average R
+   - Drawdown-adjusted utility
+4. Require minimum sample sizes before changing model behavior.
+5. Use Bayesian shrinkage when updating beliefs from paper trades.
+
+### Why This Is Better
+
+It reduces overconfidence and prevents the system from learning from noise.
+
+### Priority
+
+**P0 / P1**
+
+---
+
+## Agent 3: ML Model Risk Auditor
+
+### Verdict
+
+> The XGBoost layer is useful but under-governed.
+
+### Key Findings
+
+#### 3.3.1 Global Model Loaded Once at Startup
+
+The model is loaded globally at process startup.
+
+This is efficient, but creates operational issues:
+
+- No hot reload without restart
+- No explicit model version hash in inference logs
+- Harder to audit which model made which prediction
+
+#### 3.3.2 Missing Model Returns 0.0, Which May Be Misinterpreted
+
+If the model is missing, `evaluate_xgboost_probability` returns 0.0.
+
+This is fail-safe in one sense, but downstream logic may treat it as “low probability” instead of “model unavailable.”
+
+That distinction matters.
+
+#### 3.3.3 AUC Gate of 0.53 Is Weak
+
+The retraining script skips saving if AUC <= 0.53.
+
+This is better than nothing, but weak because:
+
+- AUC alone is not enough
+- No clear evidence of purged OOS validation
+- No calibration gate
+- No drift gate
+- No stability gate
+
+#### 3.3.4 Feature Pipeline Risk
+
+The system uses enhanced indicator features. Without a feature store, risks include:
+
+- Training/serving skew
+- Feature drift
+- Silent schema changes
+- Different rolling-window behavior offline vs online
+
+### Recommendations
+
+1. Add **model registry** with:
+   - Model hash
+   - Feature schema hash
+   - Training window
+   - Validation metrics
+   - Calibration metrics
+   - Approval state
+2. Add **champion/challenger** deployment.
+3. Add **model cards** for every promoted model.
+4. Track:
+   - Brier score
+   - Log loss
+   - Calibration slope
+   - PSI drift
+   - Feature importance stability
+5. Separate:
+   - `MODEL_UNAVAILABLE`
+   - `LOW_PROBABILITY`
+   - `ABSTAIN_LOW_CONFIDENCE`
+6. Add monotonicity tests and economic plausibility checks.
+
+### Why This Is Better
+
+It prevents silent model decay and accidental promotion of bad models.
+
+### Priority
+
+**P0 / P1**
+
+---
+
+## Agent 4: Portfolio Risk Officer
+
+### Verdict
+
+> Trade-level risk is good. Portfolio-level risk is incomplete.
+
+### Key Findings
+
+#### 3.4.1 Position Sizing Is Strong at Individual Trade Level
+
+The risk arbiter includes:
+
+- Max 1.5% portfolio risk per trade
+- ADTV participation constraints
+- Circuit-band awareness
+- Sector caps
+- Macro cash exposure targets
+
+This is good.
+
+#### 3.4.2 But Correlation Risk Is Not Fully Modeled
+
+Even with max 3 positions, the portfolio can be dangerously concentrated if the positions are:
+
+- Highly correlated
+- In the same factor regime
+- Sensitive to the same macro shock
+- Illiquid under stress
+
+#### 3.4.3 Monthly Drawdown Circuit Breaker Is Good But Too Binary
+
+A hard halt at 6% monthly drawdown is safer than no breaker.
+
+But it may create:
+
+- Whipsaw behavior
+- Missed recovery
+- Abrupt re-entry risk
+
+#### 3.4.4 Exit Liquidity Risk Is Underestimated
+
+The system checks upper circuit for entry, but live exits can fail in:
+
+- Lower circuit conditions
+- Liquidity dry-ups
+- Suspensions
+- T2T restrictions
+
+### Recommendations
+
+1. Add portfolio-level:
+   - VaR
+   - CVaR
+   - Stress loss
+   - Factor exposure
+   - Beta exposure
+2. Use shrinkage covariance estimation:
+   - Ledoit-Wolf
+   - EWMA covariance
+3. Add risk contribution caps:
+   - No single position contributes > X% of portfolio risk
+4. Add volatility targeting:
+   \[
+   L_t = \min\left(1, \frac{\sigma_{target}}{\hat{\sigma}_{p,t}}\right)
+   \]
+5. Replace binary drawdown halt with smooth de-risking.
+6. Add lower-circuit exit risk scoring.
+7. Add stress scenarios:
+   - Index crash
+   - Sector crash
+   - Liquidity drought
+   - VIX spike
+   - Small-cap de-rating
+
+### Why This Is Better
+
+It protects against correlated blowups that per-trade stops cannot prevent.
+
+### Priority
+
+**P0 / P1**
+
+---
+
+## Agent 5: Execution & Market Microstructure Auditor
+
+### Verdict
+
+> The execution layer is too paper-friendly.
+
+### Key Findings
+
+#### 3.5.1 Slippage Is Modeled Too Simply
+
+The execution logic appears to use:
+
+- Market-cap tier-based slippage
+- `executed_price = price * (1 + slippage)`
+
+This is a start, but misses:
+
+- Order-size impact
+- Spread cost
+- Partial fills
+- Queue position
+- Time of day
+- Volatility regime
+
+#### 3.5.2 Upper Circuit Check Is Good, But Not Enough
+
+Rejecting entries if slipped price exceeds upper circuit is useful.
+
+But live trading also needs:
+
+- Lower circuit exit risk
+- Circuit-band proximity warnings
+- Fill probability estimates
+- Order rejection handling
+
+#### 3.5.3 No Clear TCA Framework
+
+There is no strong evidence of systematic Transaction Cost Analysis:
+
+- Arrival price slippage
+- VWAP slippage
+- Cost by liquidity tier
+- Cost by volatility regime
+- Cost by order size
+
+### Recommendations
+
+1. Build a fill model:
+   - Full fill probability
+   - Partial fill probability
+   - Reject probability
+2. Use size-aware impact:
+   \[
+   Impact \approx \eta \sigma \sqrt{\frac{Q}{ADV}}
+   \]
+3. Track TCA metrics:
+   - Slippage vs arrival price
+   - Slippage vs VWAP
+   - Fill rate
+   - Cancel rate
+   - Retry rate
+4. Add order state machine:
+   - NEW
+   - PARTIALLY_FILLED
+   - FILLED
+   - CANCELLED
+   - REJECTED
+   - EXPIRED
+5. Add broker reconciliation:
+   - Orders
+   - Trades
+   - Positions
+   - Funds
+6. Add pre-trade cost estimate and post-trade cost attribution.
+
+### Why This Is Better
+
+It prevents the system from believing in fills that will not happen in real markets.
+
+### Priority
+
+**P0 if going live, P1 otherwise**
+
+---
+
+## Agent 6: Data Engineering & Point-in-Time Auditor
+
+### Verdict
+
+> Data architecture is decent, but not yet trustworthy enough for production.
+
+### Key Findings
+
+#### 3.6.1 DuckDB Is Good for Research but Operationally Limited
+
+DuckDB is excellent for analytics, but a single embedded file creates:
+
+- Backup complexity
+- Restore complexity
+- Concurrency limits
+- Disaster recovery challenges
+
+The repository even shows a `.lock` file artifact, indicating runtime state may be leaking into source control.
+
+#### 3.6.2 Scraping-Based Fundamentals Are Fragile
+
+Screener-style scraping can break due to:
+
+- HTML changes
+- Rate limits
+- ToS changes
+- Missing units
+- Inconsistent formatting
+
+#### 3.6.3 Corporate Actions Are Not Comprehensive Enough
+
+The system handles splits/bonus adjustments, but may miss:
+
+- Dividends
+- Rights
+- Spin-offs
+- Buybacks
+- Mergers
+- Demergers
+- Suspensions
+- Delistings
+- Symbol changes
+
+#### 3.6.4 No Clear Bitemporal Model
+
+For fundamentals and corporate actions, point-in-time correctness requires two timestamps:
+
+- Valid time
+- As-of time
+
+Without this, restatements can leak future information into backtests.
+
+### Recommendations
+
+1. Add **data contracts** for every source:
+   - Schema
+   - Freshness SLA
+   - Null policy
+   - Range checks
+   - Retry policy
+   - Fallback source
+2. Add **bitemporal storage** for fundamentals.
+3. Add **symbol canonicalization**:
+   - Trim spaces
+   - Normalize exchange suffix
+   - Map ISIN / NSE / BSE
+4. Add **immutable event log** for corporate actions.
+5. Add **backup/restore tests**.
+6. Move operational state to Postgres/SQLite if needed.
+7. Keep DuckDB/Parquet for analytics.
+8. Remove runtime lock/artifacts from git.
+
+### Why This Is Better
+
+It reduces leakage, silent corruption, and operational failure.
+
+### Priority
+
+**P0 / P1**
+
+---
+
+## Agent 7: Shariah & Financial Statement Auditor
+
+### Verdict
+
+> Shariah screening is a strong differentiator, but data quality and governance need major hardening.
+
+### Key Findings
+
+#### 3.7.1 Scraped Ratios Are Risky for Compliance
+
+If ratios come from scraped fundamentals, risks include:
+
+- Stale data
+- Wrong units
+- Misclassified sectors
+- Restatements
+- Missing values
+- Filing-date mismatch
+
+#### 3.7.2 Purification Reporting Is Good But Needs Accounting Rigor
+
+The purification report is valuable, but should be backed by:
+
+- Double-entry ledger logic
+- Event-level dividend and income records
+- Scholar-approved calculation methodology
+- Audit trail
+
+#### 3.7.3 Missing Scholarly Governance
+
+There is no clear evidence of:
+
+- Fatwa versioning
+- Scholar sign-off
+- Quarterly re-certification
+- Override audit trail
+
+### Recommendations
+
+1. Build a **Shariah Data Quality Engine**:
+   - Unit normalization
+   - Filing-date alignment
+   - Missing-data fail-closed behavior
+   - Ratio recomputation from raw statements
+2. Add **override logs** with human approval.
+3. Add **fatwa reference mapping**.
+4. Add **purification ledger**.
+5. Add quarterly review process.
+
+### Why This Is Better
+
+It turns Shariah screening from a heuristic filter into a defensible compliance system.
+
+### Priority
+
+**P1**
+
+---
+
+## Agent 8: LLM/AI Safety & Decision Governance Auditor
+
+### Verdict
+
+> The LLM layer is useful but must be constrained more tightly.
+
+### Key Findings
+
+#### 3.8.1 Deterministic Risk First Is Excellent
+
+The architecture correctly prevents LLMs from having direct capital authority.
+
+#### 3.8.2 Conviction Scoring Is Still Risky
+
+The Research Judge assigns conviction scores based on free-text synthesis.
+
+Risks:
+
+- Prompt sensitivity
+- Numeric hallucination
+- Overconfidence
+- Flaky parsing
+- Narrative bias
+
+#### 3.8.3 External Scraped Content Can Inject Prompts
+
+If Bull/Bear agents consume scraped fundamentals, TradingView text, or announcements, adversarial text can influence LLM behavior.
+
+#### 3.8.4 LLM Fallback May Hide Degradation
+
+The waterfall fallback is good for resilience, but if the final fallback is deterministic text, the system may silently degrade without clear state tracking.
+
+### Recommendations
+
+1. Force **structured JSON outputs** for all agents.
+2. Validate outputs with Pydantic.
+3. Require evidence references:
+   - Metric IDs
+   - Table fields
+   - Source rows
+4. Add prompt-injection sanitization:
+   - Treat scraped content as untrusted
+   - Separate instructions from data
+   - Block instruction-like text
+5. Track agent-level:
+   - Brier score
+   - Calibration
+   - Hit rate
+   - False positive cost
+6. Use LLMs for:
+   - Explanation
+   - Risk discovery
+   - Hypothesis generation  
+   not final numeric conviction.
+7. Add LLM cost and latency telemetry.
+
+### Why This Is Better
+
+It preserves LLM usefulness while reducing hallucination and manipulation risk.
+
+### Priority
+
+**P0**
+
+---
+
+## Agent 9: Security Red Team Auditor
+
+### Verdict
+
+> The system has good security awareness, but production hardening is incomplete.
+
+### Key Findings
+
+#### 3.9.1 Kill-Switch Is Powerful But Needs Strong Authentication
+
+A `/HALT_ALL` command is excellent, but if exposed through Telegram or UI, it needs:
+
+- Strong user authentication
+- Role-based authorization
+- Audit logging
+- Rate limiting
+- Confirmation workflow
+
+#### 3.9.2 Streamlit Dashboard Needs Access Controls
+
+If the dashboard is exposed beyond localhost, it needs:
+
+- Authentication
+- Authorization
+- Session controls
+- Audit logs
+
+#### 3.9.3 Scraping Creates Security and Legal Surface
+
+External scraping can introduce:
+
+- SSRF risk
+- Malicious payload injection
+- ToS violations
+- Dependency on unstable endpoints
+
+#### 3.9.4 Secrets and Dependency Risk
+
+The system uses multiple API keys and libraries.
+
+Needs:
+
+- Secret manager
+- Key rotation
+- Dependency CVE scanning
+- Least-privilege broker API keys
+- Signed artifacts
+
+### Recommendations
+
+1. Add authentication to all user-facing controls.
+2. Add immutable audit logs for:
+   - Halt commands
+   - Overrides
+   - Model promotion
+   - Trade decisions
+3. Add dependency scanning.
+4. Add egress allowlist for scraping.
+5. Add secret encryption and rotation.
+6. Add prompt-injection defenses.
+
+### Priority
+
+**P1**
+
+---
+
+## Agent 10: SRE / DevOps Auditor
+
+### Verdict
+
+> The system is script-rich but orchestration-poor.
+
+### Key Findings
+
+#### 3.10.1 Cron-Style Architecture Is Brittle
+
+The system has many scripts:
+
+- premarket
+- live preview
+- reconciliation
+- drawdown
+- feedback
+- model training
+- corporate actions
+- purification
+
+This works early, but becomes fragile.
+
+#### 3.10.2 Observability Is Likely Insufficient
+
+There is not enough evidence of:
+
+- Metrics
+- Traces
+- Alert routing
+- SLA dashboards
+- Data freshness monitoring
+- Model drift dashboards
+
+#### 3.10.3 Backup and Disaster Recovery Need Testing
+
+A trading system must have tested:
+
+- DB backup
+- Restore runbook
+- Model rollback
+- Config rollback
+- State recovery
+
+### Recommendations
+
+1. Add an orchestrator:
+   - Prefect / Dagster / Airflow / Temporal
+2. Add idempotent task execution.
+3. Add retry and dead-letter handling.
+4. Add observability:
+   - Logs
+   - Metrics
+   - Alerts
+   - Dashboards
+5. Add health checks for:
+   - Ingestion freshness
+   - DB writability
+   - LLM availability
+   - Broker connectivity
+   - Model presence
+6. Add disaster recovery drills.
+
+### Priority
+
+**P1**
+
+---
+
+## Agent 11: Legal & Compliance Auditor
+
+### Verdict
+
+> The system has meaningful legal and compliance blind spots.
+
+### Key Findings
+
+#### 3.11.1 Scraping May Violate ToS
+
+Sources like:
+
+- Screener
+- TradingView
+- yfinance-style feeds
+
+may have terms-of-service limitations.
+
+#### 3.11.2 Financial Advice Risk
+
+If the system produces recommendations or trade cards, it must be clear that:
+
+- It is not investment advice
+- Human is responsible
+- Outputs are decision-support only
+
+#### 3.11.3 Broker API and Algo Rules
+
+Live order placement through broker APIs may have regulatory and operational constraints.
+
+### Recommendations
+
+1. Create a **Data Source Compliance Register**.
+2. Add explicit disclaimer layers.
+3. Add human approval gates for live orders.
+4. Document model risk governance.
+5. Consider licensed data sources for critical inputs.
+
+### Priority
+
+**P1**
+
+---
+
+## Agent 12: Finance & Accounting Auditor
+
+### Verdict
+
+> The P&L logic is useful but not yet a full financial ledger.
+
+### Key Findings
+
+#### 3.12.1 Paper Trades Need Accounting-Grade Ledger
+
+For live readiness, the system needs:
+
+- Double-entry ledger
+- Immutable transaction events
+- Corporate action cash events
+- Dividend events
+- Tax and charge tracking
+- Purification accounting
+
+#### 3.12.2 Performance Measurement Needs More Than P&L
+
+Need:
+
+- Time-weighted returns
+- Money-weighted returns
+- Benchmark-relative returns
+- Factor attribution
+- Cost attribution
+
+### Recommendations
+
+1. Build event-sourced ledger.
+2. Add TWR/MWR reporting.
+3. Add attribution:
+   - Sector
+   - Factor
+   - Signal
+   - Exit rule
+   - Cost
+4. Add tax and charge modeling.
+
+### Priority
+
+**P1 / P2**
+
+---
+
+## Agent 13: Human Factors Auditor
+
+### Verdict
+
+> Human oversight exists but needs more decision hygiene.
+
+### Key Findings
+
+#### 3.13.1 Human Sign-Off Blocks Are Good
+
+The agency process uses explicit approval blocks.
+
+#### 3.13.2 But Override Behavior Needs Stronger Auditing
+
+If humans can override risk or halt states, every override must be:
+
+- Identified
+- Justified
+- Logged
+- Reviewed
+
+#### 3.13.3 Alert Fatigue Risk
+
+Too many warnings can make halt alerts ineffective.
+
+### Recommendations
+
+1. Add override reason codes.
+2. Add four-eyes principle for critical overrides.
+3. Add alert severity taxonomy.
+4. Add decision explanation cards.
+5. Add weekly override review.
+
+### Priority
+
+**P1**
+
+---
+
+## Agent 14: Devil’s Advocate / Master Critic
+
+### Verdict
+
+> The system may be overestimating its readiness because it has many good controls, but not enough proof that those controls produce profitable, robust outcomes.
+
+### Hidden Failure Modes Identified
+
+1. **Good architecture can still hide bad alpha.**
+2. **Strong risk rules can still fail if data is wrong.**
+3. **LLM debate can create false confidence.**
+4. **Paper trading can hide execution risk.**
+5. **Feedback loops can learn noise.**
+6. **Shariah screening can fail silently if fundamentals are stale.**
+7. **Backtests can be cost-blind and still look excellent.**
+8. **A hard drawdown breaker can create false safety if tail risk is not modeled.**
+9. **A single-file DB can become a single point of failure.**
+10. **A kill-switch is only as safe as its authentication and audit trail.**
+
+### Master Critic Recommendation
+
+Do not ask:
+
+> “What new indicator can we add?”
+
+Ask instead:
+
+> “What evidence proves this system is not fooling itself?”
+
+---
+
+# 4. Cross-Agent Consensus: What Must Be Improved First
+
+The specialized agents converged on the following priorities.
+
+## P0 — Must Fix Before Trusting the System More Deeply
+
+| Priority | Improvement | Why It Matters |
+|---|---|---|
+| P0-1 | Cost-aware walk-forward backtesting | Prevents false alpha |
+| P0-2 | ML calibration and abstention | Prevents overconfidence |
+| P0-3 | Structured LLM outputs | Prevents hallucination and parsing risk |
+| P0-4 | Data completeness fail-closed gates | Prevents decisions on missing data |
+| P0-5 | Backup/restore testing | Prevents catastrophic loss |
+| P0-6 | Execution slippage / TCA model | Prevents paper-market illusion |
+| P0-7 | Model registry and versioning | Prevents silent model drift |
+| P0-8 | Prompt-injection defenses | Prevents adversarial manipulation |
+| P0-9 | Point-in-time data validation | Prevents lookahead bias |
+| P0-10 | Kill-switch authentication and audit | Prevents abuse |
+
+---
+
+## P1 — Should Be Implemented Soon After P0
+
+| Priority | Improvement | Why It Matters |
+|---|---|---|
+| P1-1 | Portfolio-level risk budgeting | Reduces correlated blowups |
+| P1-2 | Orchestrator and observability | Improves reliability |
+| P1-3 | Shariah data governance | Improves compliance trust |
+| P1-4 | Feature store / feature registry | Prevents train/serve skew |
+| P1-5 | Drift monitoring | Detects silent decay |
+| P1-6 | Corporate action expansion | Prevents distorted signals |
+| P1-7 | Legal/data source compliance register | Reduces scraping risk |
+| P1-8 | Financial ledger and attribution | Improves performance truth |
+| P1-9 | Human override audit | Improves governance |
+| P1-10 | Champion/challenger model pipeline | Safer adaptation |
+
+---
+
+## P2 — Strategic Enhancements
+
+| Priority | Improvement | Why It Matters |
+|---|---|---|
+| P2-1 | Regime detection | Better risk-off behavior |
+| P2-2 | Event-driven signals | More diverse alpha |
+| P2-3 | Multi-strategy allocation | Improves robustness |
+| P2-4 | Market replay engine | Better live readiness |
+| P2-5 | Advanced mean reversion | Better signal quality |
+| P2-6 | HRP / robust portfolio optimization | Better allocation |
+| P2-7 | Attribution lab | Better learning |
+| P2-8 | RAG over filings/announcements | Better qualitative analysis |
+
+---
+
+# 5. New Approaches the Team Recommends Considering
+
+These are not just incremental fixes. They are meaningful method upgrades.
+
+---
+
+## 5.1 Triple-Barrier Labeling Instead of Simple Forward Returns
+
+### Current approach
+
+The research code appears to use forward 5-day returns or relative forward returns.
+
+### Better approach
+
+Use triple-barrier labeling:
+
+- Profit target barrier
+- Stop-loss barrier
+- Time expiration barrier
+
+### Why it is better
+
+It trains the model to predict actual trade outcomes under risk rules, not just raw price movement.
+
+### Trade-offs
+
+- More complex labeling
+- Requires careful barrier calibration
+
+### Worth it?
+
+**Yes — high value**
+
+---
+
+## 5.2 Meta-Labeling
+
+### Idea
+
+Use one model to generate candidates and a second model to decide whether the candidate should be traded.
+
+### Why it is better
+
+It separates:
+
+- Signal discovery
+- Trade approval
+
+### Worth it?
+
+**Yes — high value**
+
+---
+
+## 5.3 Conformal Prediction for Selective Trading
+
+### Idea
+
+Instead of trusting raw probability, produce calibrated prediction intervals and abstain when uncertainty is high.
+
+### Why it is better
+
+It improves:
+
+- Risk control
+- Trade selection
+- Drawdown behavior
+
+### Worth it?
+
+**Yes — high value**
+
+---
+
+## 5.4 Hierarchical Risk Parity or Risk Budgeting
+
+### Idea
+
+Allocate risk based on clustering and covariance structure rather than simple per-trade sizing.
+
+### Why it is better
+
+It reduces:
+
+- Concentration
+- Correlation risk
+- Factor crowding
+
+### Worth it?
+
+**Yes — medium/high value**
+
+---
+
+## 5.5 Bitemporal Point-in-Time Data Model
+
+### Idea
+
+Store facts with both:
+
+- Valid time
+- As-of time
+
+### Why it is better
+
+It prevents lookahead bias from restatements and delayed information.
+
+### Worth it?
+
+**Yes — critical**
+
+---
+
+## 5.6 Market Replay / Digital Twin
+
+### Idea
+
+Replay historical market states through the full decision pipeline.
+
+### Why it is better
+
+It reveals:
+
+- Pipeline bugs
+- Execution issues
+- Prompt instability
+- Risk-gate failures
+
+### Worth it?
+
+**Yes — P2 high value**
+
+---
+
+## 5.7 LLM Structured Evidence Layer
+
+### Idea
+
+Require LLM agents to cite structured evidence IDs rather than free-text claims.
+
+### Why it is better
+
+It reduces hallucination and improves auditability.
+
+### Worth it?
+
+**Yes — high value**
+
+---
+
+## 5.8 Event-Driven Anti-Trap Layer
+
+### Idea
+
+Expand anti-trap shield with:
+
+- Pledge increase alerts
+- Governance red flags
+- Board meeting outcomes
+- Bulk/block deal analysis
+- Index inclusion/exclusion effects
+
+### Why it is better
+
+It improves trap detection beyond technicals.
+
+### Worth it?
+
+**Yes — P2 strategic**
+
+---
+
+# 6. Comparison: Current Approach vs Better Alternatives
+
+| Area | Current Approach | Weakness | Better Alternative | Why Better |
+|---|---|---:|---|---|
+| Backtesting | Static split | Overfitting | Walk-forward + purging | More truthful |
+| ML target | Forward return | Ignores risk rules | Triple-barrier | Aligns with trading |
+| ML gate | Fixed probability | Arbitrary | Calibrated utility | Better decisions |
+| Sizing | Trade-level risk | Ignores correlation | Portfolio risk budgeting | Safer |
+| Execution | Static slippage | Unrealistic | Fill + TCA model | Live-ready |
+| Data | Scrapers + DuckDB | Fragile | Contracts + bitemporal | Less leakage |
+| LLM | Free-text debate | Hallucination | Structured outputs | Safer |
+| Feedback | Win-rate warnings | Noise-sensitive | Statistical gates | More robust |
+| Shariah | Rule filter | Data quality risk | Governance engine | More defensible |
+| Ops | Scripts/cron | Brittle | Orchestrator + observability | More reliable |
+
+---
+
+# 7. What Previous Audits Got Right
+
+The previous audit findings remain directionally valid in many areas.
+
+## Still valid
+
+1. **Deterministic risk primacy is correct**
+2. **DuckDB concurrency control was necessary**
+3. **Shariaah net-liquid-asset checks are important**
+4. **Corporate action math is necessary**
+5. **Anti-trap screening is valuable**
+6. **EOD reconciliation is essential**
+7. **Kill-switch and circuit breakers are essential**
+8. **Second opinion gate is conceptually useful**
+9. **Model retraining gate is better than no gate**
+10. **Paper trading before live is essential**
+
+## But previous audits underweighted these issues
+
+1. Calibration
+2. Portfolio covariance
+3. Execution fill realism
+4. Point-in-time fundamentals
+5. Prompt injection
+6. Legal/data licensing
+7. Backup/restore testing
+8. Model drift
+9. LLM output structure
+10. Statistical significance of feedback
+
+---
+
+# 8. What Was Probably Missed Previously
+
+These are the most important newly emphasized gaps.
+
+---
+
+## 8.1 Missing Data Should Trigger Abstention, Not Approximation
+
+If critical inputs like ATR are missing, the system should not approximate too casually.
+
+Example risk:
+
+- deterministic risk node may use fallback ATR if missing
+
+### Better behavior
+
+If critical data is missing:
+
+- Reject setup
+- Or mark `DATA_INCOMPLETE`
+- Or route to manual review
+
+Do not silently approximate.
+
+---
+
+## 8.2 Model Missing Should Be Treated as System Degradation
+
+Returning probability 0.0 when model is missing is safer than crashing, but the system should also raise:
+
+- `MODEL_UNAVAILABLE`
+- degraded-mode alert
+- no-trade or reduced-risk state
+
+---
+
+## 8.3 Lower Circuit Exit Risk Is Missing
+
+Entry upper-circuit checks are good, but exits can fail during lower circuits.
+
+This is a major live-market risk.
+
+---
+
+## 8.4 Symbol Normalization Risk
+
+The repository snippets show ticker strings that may contain formatting inconsistencies.
+
+The system needs:
+
+- Trim
+- Canonical symbol table
+- Exchange suffix normalization
+- Duplicate detection
+
+---
+
+## 8.5 Benchmark Feed Reliability
+
+Using yfinance for benchmark and VIX is okay for research but weak for production.
+
+Need:
+
+- Official index feed
+- Fallback source
+- Missing-day interpolation policy
+- Benchmark reconciliation checks
+
+---
+
+## 8.6 LLM Cost Governance
+
+The waterfall is good, but production needs:
+
+- Daily token budget
+- Per-symbol cost tracking
+- Cache
+- Model routing policy
+- Cost alerts
+
+---
+
+## 8.7 Runtime Artifacts Should Not Be in Repo
+
+A DuckDB lock file appearing in the repository tree suggests runtime artifacts may be leaking.
+
+Add to `.gitignore`:
+
+- `*.duckdb`
+- `*.duckdb.lock`
+- local logs
+- local model artifacts unless versioned intentionally
+
+---
+
+# 9. What Is Worth Implementing vs Not Worth Implementing
+
+## 9.1 Definitely Worth Implementing
+
+| Improvement | Priority | Reason |
+|---|---:|---|
+| Cost-aware backtesting | P0 | Prevents false alpha |
+| ML calibration | P0 | Prevents overconfidence |
+| Structured LLM outputs | P0 | Reduces hallucination |
+| Data fail-closed gates | P0 | Prevents bad decisions |
+| Backup/restore drills | P0 | Prevents catastrophic loss |
+| TCA / slippage model | P0/P1 | Prevents execution illusion |
+| Model registry | P1 | Prevents silent drift |
+| Portfolio risk budgeting | P1 | Prevents correlated loss |
+| Orchestrator | P1 | Improves reliability |
+| Shariah data governance | P1 | Improves compliance trust |
+
+---
+
+## 9.2 Worth Implementing After Core Stabilization
+
+| Improvement | Priority | Reason |
+|---|---:|---|
+| Regime detection | P2 | Better risk-off |
+| Event-driven signals | P2 | More diverse alpha |
+| Market replay | P2 | Better live readiness |
+| Advanced mean reversion | P2 | Better signal quality |
+| Attribution lab | P2 | Better learning |
+| HRP optimizer | P2 | Better allocation |
+
+---
+
+## 9.3 Not Worth Implementing Right Now
+
+| Idea | Why Not |
+|---|---|
+| Full microservices | Overkill for current scale |
+| Kubernetes | Too much operational overhead |
+| High-frequency trading | Requires infrastructure not present |
+| RL-based live sizing | Too risky without robust simulator |
+| Autonomous strategy generation in production | High overfitting risk |
+| Exotic alternative data before core validation | Costly and distracting |
+| Blockchain audit trail | Unnecessary complexity |
+| Heavy real-time deep learning | Latency and reliability risk |
+
+---
+
+# 10. Recommended Target Architecture
+
+The team recommends evolving into a modular, governed, research-to-production platform.
+
+```text
+[Ingestion]
+  ├─ Market Data
+  ├─ Fundamentals
+  ├─ Corporate Actions
+  ├─ News / Announcements
+  └─ Macro Feeds
+        │
+        ▼
+[Data Quality]
+  ├─ Schema Validation
+  ├─ Freshness Checks
+  ├─ Outlier Detection
+  ├─ Reconciliation
+  └─ Quarantine Queue
+        │
+        ▼
+[Point-in-Time Store]
+  ├─ Operational DB
+  ├─ Analytical Store / Parquet
+  └─ Feature Store
+        │
+        ▼
+[Research Engine]
+  ├─ Backtester
+  ├─ Walk-Forward Engine
+  ├─ Cost Model
+  ├─ Labeling Engine
+  └─ Experiment Registry
+        │
+        ▼
+[Model Governance]
+  ├─ Training
+  ├─ Calibration
+  ├─ Validation Gates
+  ├─ Model Registry
+  └─ Champion / Challenger
+        │
+        ▼
+[Decision Engine]
+  ├─ Screening
+  ├─ Shariah Rules
+  ├─ Risk Rules
+  ├─ ML Scoring
+  ├─ LLM Advisory Layer
+  └─ Deterministic Arbiter
+        │
+        ▼
+[Portfolio Construction]
+  ├─ Optimizer
+  ├─ Risk Budgeting
+  ├─ Cash Allocation
+  └─ Turnover Control
+        │
+        ▼
+[Execution]
+  ├─ Order Management
+  ├─ Fill Simulation
+  ├─ TCA
+  └─ Reconciliation
+        │
+        ▼
+[Monitoring & Governance]
+  ├─ Drift Monitoring
+  ├─ Attribution
+  ├─ Alerts
+  ├─ Audit Logs
+  └─ Human Override Controls
+```
+
+---
+
+# 11. Recommended Implementation Roadmap
+
+## Phase 0: Immediate Hardening
+
+**Timeline:** 0–2 weeks  
+**Goal:** Remove the most dangerous blind spots.
+
+### Must-do tasks
+
+1. Add fail-closed gates for missing:
+   - ATR
+   - ML model
+   - Shariah data
+   - Fundamentals
+   - Benchmark data
+2. Add ML calibration report.
+3. Add structured JSON outputs for LLM agents.
+4. Add prompt-injection sanitization.
+5. Add backup and restore test.
+6. Add execution slippage logging.
+7. Add model version hash logging.
+8. Add kill-switch authentication and audit log.
+9. Add data quality checks.
+10. Remove runtime artifacts from repo.
+
+### Acceptance criteria
+
+- No trade can proceed when critical data is missing.
+- LLM outputs are schema-validated.
+- Restore from backup succeeds in test.
+- Every halt event is authenticated and logged.
+- Every prediction logs model version.
+
+---
+
+## Phase 1: Quant and Production Hardening
+
+**Timeline:** 2–6 weeks  
+**Goal:** Make the system statistically and operationally stronger.
+
+### Must-do tasks
+
+1. Walk-forward backtesting.
+2. Transaction-cost model.
+3. Triple-barrier labeling.
+4. Feature registry.
+5. Model registry.
+6. Drift monitoring.
+7. Portfolio covariance and risk report.
+8. Orchestrator.
+9. Observability dashboards.
+10. TCA reporting.
+
+### Acceptance criteria
+
+- Backtests report net metrics after costs.
+- Model promotion requires calibration and drift gates.
+- Portfolio risk report shows correlation and factor exposure.
+- Pipeline failures produce alerts and retries.
+
+---
+
+## Phase 2: Strategic Alpha and Architecture Upgrades
+
+**Timeline:** 1–3 months  
+**Goal:** Improve edge and robustness.
+
+### Must-do tasks
+
+1. Regime detection.
+2. Event-driven anti-trap expansion.
+3. Multi-strategy allocation.
+4. Market replay engine.
+5. Advanced mean reversion.
+6. Attribution lab.
+7. Shariah governance workflow.
+8. Financial ledger upgrade.
+
+### Acceptance criteria
+
+- Strategy performance is explained by attribution.
+- Regime filters improve drawdown without destroying expectancy.
+- Event signals are validated independently.
+
+---
+
+# 12. Final Team Consensus
+
+## The system is already strong in these ways
+
+- Deterministic risk authority
+- Layered architecture
+- Shariah differentiation
+- Anti-trap awareness
+- Reconciliation and circuit breakers
+- Audit-driven development
+
+## The system is still weak in these ways
+
+- Statistical validation
+- Cost realism
+- Calibration
+- Portfolio-level risk
+- Execution realism
+- Point-in-time data governance
+- LLM guardrails
+- Operational observability
+
+## The single most important next step
+
+Do not add more indicators first.
+
+Instead:
+
+> **Prove that the existing edge survives costs, calibration, point-in-time data, and realistic execution.**
+
+---
+
+# 13. Bottom Line
+
+The multi-agent reanalysis concludes:
+
+1. **The system is not optimal.**
+2. **The system is not live-capital ready yet.**
+3. **The system is still very promising.**
+4. **The best next improvements are foundational, not exotic.**
+5. **The highest ROI work is validation, calibration, risk aggregation, execution realism, and data governance.**
+
+If the team executes the P0/P1 roadmap, AlphaSentinel can evolve from a sophisticated paper-trading research platform into a genuinely robust decision-support and trading operations system.
+
+If the team skips these steps and adds more alpha features instead, the system risks becoming more complex without becoming more truthful.
+
+---
+
+**End of Multi-Agent Reanalysis Report**

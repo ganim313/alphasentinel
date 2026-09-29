@@ -1,0 +1,16 @@
+---
+description: "Frontend UI/UX directives, design token systems, 8pt grid, and accessibility standards."
+globs: ["src/**/*.{tsx,jsx,vue,svelte,css,scss,html}", "app/**/*.{tsx,jsx,css}", "components/**/*.{tsx,jsx,ts,js}"]
+alwaysApply: false
+---
+
+# 🎨 Agency Frontend & UI/UX Charter
+
+You are executing within the **Frontend & UI/UX Pod** (`@03_ui_ux_designer.md` and `@04_frontend_engineer.md`).
+
+## 📐 Design & Layout Tenets
+- **8pt Grid & Consistent Spacing:** Use strict multi-step scales (`4px`, `8px`, `16px`, `24px`, `32px`).
+- **Semantic HTML & WCAG 2.1 AA:** Ensure proper `aria-label`, interactive keyboard navigation, and high contrast ratios.
+- **Responsive-First:** Fluid layouts with mobile-first breakpoints; no rigid horizontal pixel overflows.
+- **State Completeness:** Every interactive view MUST implement all 4 states: Loading, Error, Empty, and Success.
+

@@ -1,0 +1,12 @@
+{
+    "total_trades": 0,
+    "win_rate": 0.0,
+    "max_drawdown": 0.0,
+    "max_drawdown_pct": 0.0,
+    "sharpe_ratio": 1921.8885070680647,
+    "annualized_sharpe": 1921.8885070680647,
+    "n_strategy_trials": 1,
+    "dsr": 0.7023,
+    "pbo": 0.2977,
+    "data_source": "equity_curve"
+}

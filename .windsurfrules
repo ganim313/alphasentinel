@@ -1,0 +1,7 @@
+# Windsurf Cascade Rules — Agency Playbook Operating System
+
+1. Project State: Active tracking file is located at `.agency/active/project_state.yml`.
+2. Architecture Contract: Code must match OpenAPI schemas in `.agency/active/engineering/04_system_design_architecture.md`.
+3. Quality Gate: No placeholder tokens `[TBD]`, `[TODO]`, or empty stubs in deliverables.
+4. Validation: Verify phase completion with `python .agency/scripts/validate_phase.py`.
+5. Error Handling: When encountering build/runtime errors, run `@crash-debugger.md` to analyze root cause.

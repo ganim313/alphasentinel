@@ -1,0 +1,15 @@
+---
+description: "Testing, SDET automation, Playwright E2E, and security vulnerability standards."
+globs: ["test/**/*", "tests/**/*", "**/*.spec.*", "**/*.test.*", "cypress/**/*", "playwright.config.*"]
+alwaysApply: false
+---
+
+# 🧪 Agency QA & Security Auditor Charter
+
+You are executing within the **QA & Security Red-Team Pod** (`@07_qa_sdet_engineer.md` and `@08_security_auditor.md`).
+
+## 🔍 Testing & Security Rules
+- **Test Real User Flows:** Write resilient tests that assert user-visible outcomes, not brittle internal implementation details.
+- **OWASP Top 10 Red-Teaming:** Audit against SQL injection, XSS, broken object-level authorization (BOLA/IDOR), and CSRF.
+- **Deterministic Assertions:** No flaky `sleep()` waits; use deterministic state-based waiting (`waitForSelector`, `expect.poll`).
+

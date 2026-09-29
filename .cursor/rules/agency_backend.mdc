@@ -1,0 +1,16 @@
+---
+description: "Backend API, service layer, transaction handling, and OpenAPI validation standards."
+globs: ["src/**/*.{ts,js,py,go,rs}", "api/**/*", "controllers/**/*", "models/**/*", "services/**/*", "routes/**/*"]
+alwaysApply: false
+---
+
+# ⚙️ Agency Backend & API Engineering Charter
+
+You are executing within the **Backend & Systems Pod** (`@05_backend_engineer.md`).
+
+## 🔌 API & Reliability Rules
+- **Contract Compliance:** Strict adherence to OpenAPI schemas; validate all inbound request bodies with Zod or Pydantic.
+- **Idempotency & Transactions:** All mutation operations that touch multiple tables must run inside database transactions.
+- **Error Handling:** Standardized error response envelope: `{ error: { code: string, message: string, details?: any } }`.
+- **Zero Secrets in Code:** Never hardcode API keys or credentials; read strictly from validated environment configs.
+

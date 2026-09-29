@@ -1,0 +1,16 @@
+[Unit]
+Description=AlphaSentinel Streamlit Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/trading-agents
+ExecStart=/home/ubuntu/trading-agents/venv/bin/streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/trading-agents/logs/dashboard.log
+StandardError=append:/home/ubuntu/trading-agents/logs/dashboard.log
+
+[Install]
+WantedBy=multi-user.target

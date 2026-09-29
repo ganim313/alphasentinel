@@ -1,0 +1,38 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+
+# Databases & Backups
+*.duckdb
+*.duckdb.*
+*.lock
+data/backups/
+
+# Models & Machine Learning Artifacts
+models/
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# Logs & Runtime
+logs/
+*.log
+
+# Repo dumps & temporary files
+repomix-output.xml
+user_inputs.txt

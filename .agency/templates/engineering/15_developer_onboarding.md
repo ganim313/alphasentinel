@@ -1,0 +1,50 @@
+---
+template_id: "15"
+phase: 4
+assigned_role: "02_solutions_architect"
+context_from: ["04_system_design_architecture.md"]
+outputs_to: []
+status: template
+---
+# Template 15: Developer Onboarding Protocol
+
+**Purpose:** When your agency grows and you need to hire a subcontractor or junior developer to help write code, you must grant them access without compromising the client's production data or security.
+
+---
+
+## 1. Legal & Non-Disclosure (NDA)
+Before inviting the developer to GitHub:
+- [ ] Subcontractor signs an Independent Contractor Agreement clearly stating that all code written is "Work for Hire" and owned by your agency.
+- [ ] Subcontractor signs an NDA (Non-Disclosure Agreement) forbidding them from sharing the client's name or code publicly.
+
+## 2. Access Provisioning (The Principle of Least Privilege)
+Never give a subcontractor "Admin" access unless absolutely necessary.
+- [ ] **GitHub/GitLab:** Add developer to the repository with `Read` or `Write` access. Never `Maintain` or `Admin`. Protect the `main` branch so they cannot merge their own Pull Requests.
+- [ ] **Database (Supabase/PostgreSQL):** *Never* give access to the Production database. Provide them with a local Docker setup or a dedicated `staging-dev` database URL.
+- [ ] **Third-Party Keys:** Provide them with *Test* API keys for Stripe, Cloudinary, Firebase. Never expose live production keys in `.env` files shared with subcontractors.
+
+## 3. Environment Setup & Testing
+Provide the developer with the repository `README.md` and verify they can:
+- [ ] Successfully run `npm install` and `npm run dev` locally.
+- [ ] Connect to the local/staging database.
+- [ ] Run the local test suite `npm test` and verify all tests pass on their machine.
+
+## 4. Workflow Orientation
+Ensure they understand the agency's strict SDLC rules:
+- [ ] Code must be written on `feat/` or `fix/` branches.
+- [ ] All code must pass ESLint and Prettier before a PR is opened.
+- [ ] They must request a code review from the Lead Engineer (You) before any code is merged.
+
+
+---
+
+## Agent Handoff to Next Phase
+
+### Pre-Flight Checks
+- [ ] Deliverable has been reviewed against requirements.
+- [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Output complies with project_state.yml guidelines.
+
+### Context Package for Next Agent
+The following artifacts must be passed to the next phase:
+- [ ] 15_developer_onboarding.md

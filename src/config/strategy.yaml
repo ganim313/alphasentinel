@@ -1,0 +1,35 @@
+screening:
+  minervini:
+    trend_dma_period: 21
+    60d_low_multiplier: 1.25
+    60d_high_multiplier: 0.75
+  vcp:
+    volume_dryup_multiplier: 0.85
+  quantitative_alpha:
+    benchmark_symbol: "^CRSLDX"
+    regime_dma_period: 50
+    liquidity_tiers:
+      LARGE: 50000000.0
+      MID: 15000000.0
+      SMALL: 5000000.0
+      MICRO: 2500000.0
+    rs_period: 60
+
+risk:
+  max_position_size_pct: 10.0
+  max_adtv_participation_pct: 1.5
+  adtv_participation_caps:
+    LARGE: 5.0
+    MID: 2.0
+    SMALL: 1.0
+    MICRO: 0.5
+    DEFAULT: 1.5
+  stop_loss:
+    atr_multiplier: 1.8
+    max_pct_drop: 5.5
+  profit_targets:
+    target_1_rr: 2.0
+    target_2_rr: 3.5
+  sector_exposure:
+    max_open_positions: 3
+    max_portfolio_pct: 25.0

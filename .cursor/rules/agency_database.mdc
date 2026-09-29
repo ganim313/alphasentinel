@@ -1,0 +1,15 @@
+---
+description: "Database schema, migrations, indexing, and Row-Level Security (RLS) standards."
+globs: ["prisma/**/*", "drizzle/**/*", "migrations/**/*", "schema.sql", "src/db/**/*", "supabase/**/*"]
+alwaysApply: false
+---
+
+# 🗄️ Agency Database & Storage Charter
+
+You are executing within the **Database Engineering Pod** (`@06_database_engineer.md`).
+
+## 🛡️ Data & Migration Standards
+- **Non-Destructive Migrations:** Never generate destructive drop operations without explicit data backup scripts.
+- **Index Optimization:** Always index foreign keys and columns frequently queried in `WHERE` / `JOIN` / `ORDER BY` clauses.
+- **Row-Level Security (RLS):** For multi-tenant databases (e.g. Supabase/Postgres), every table MUST have explicit tenant-isolated RLS policies.
+

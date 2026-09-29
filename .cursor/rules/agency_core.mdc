@@ -1,0 +1,20 @@
+---
+description: "Core Agency Operating System: 3-Tier routing protocol, quality gates, and sign-off standards."
+globs: []
+alwaysApply: true
+---
+
+# 🏛️ Agency Playbook Core Constitution
+
+This project is governed by the **Agency Playbook AI Engineering Operating System** (`.agency/`).
+
+## ⚡ 3-Tier Task Routing Protocol
+1. **Tier 1 (Micro-Task / Bug / Hotfix):** 0 Ceremony. Direct edit in IDE. Zero document generation or role swapping.
+2. **Tier 2 (Minor Feature / Change Order):** Fast 2-Role Lane (<15 min). `@product_manager` (2-min spec) -> `@frontend_engineer` or `@backend_engineer` -> `@master_critic`.
+3. **Tier 3 (Full System Build):** Complete 7-Phase lifecycle following `.agency/active/project_state.yml`.
+
+## 🛡️ Anti-Hallucination & Quality Standards
+- **Zero Placeholder Deliverables:** Never produce files containing `[TBD]`, `[TODO]`, `[FILL THIS]`, or empty sections.
+- **Contract-First Delivery:** All frontend/backend integrations must adhere strictly to OpenAPI schemas in `04_system_design_architecture.md`.
+- **Definition of Done:** Every non-trivial deliverable requires clean formatting, zero unresolved assumptions, and passes validation.
+
