@@ -259,6 +259,18 @@ CREATE TABLE IF NOT EXISTS strategy_version (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 17. Paper Capital Configuration Register
+CREATE TABLE IF NOT EXISTS paper_capital_config (
+    id          INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    capital     DOUBLE  NOT NULL DEFAULT 1000000.0,
+    label       VARCHAR DEFAULT 'Default Paper Account',
+    set_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    reset_count INTEGER DEFAULT 0
+);
+
+INSERT OR IGNORE INTO paper_capital_config (id, capital, label, reset_count)
+VALUES (1, 1000000.0, 'Default Paper Account', 0);
+
 -- Missing composite indexes identified in System Critic Audit
 CREATE INDEX IF NOT EXISTS idx_positions_sector_status ON positions(sector, status);
 CREATE INDEX IF NOT EXISTS idx_positions_status_exit ON positions(status, exit_date);

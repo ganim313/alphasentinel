@@ -17,23 +17,26 @@ logger = logging.getLogger(__name__)
 PAPER_CAPITAL_CONFIG_TABLE = "paper_capital_config"
 
 
-def _ensure_table(conn) -> None:
-    """Create paper_capital_config table if it doesn't exist."""
-    conn.execute(f"""
-        CREATE TABLE IF NOT EXISTS {PAPER_CAPITAL_CONFIG_TABLE} (
-            id          INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-            capital     DOUBLE  NOT NULL DEFAULT 1000000.0,
-            label       VARCHAR DEFAULT 'Default Paper Account',
-            set_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            reset_count INTEGER DEFAULT 0
-        );
-    """)
-    # Seed with default ₹10 Lakhs if empty
-    conn.execute(f"""
-        INSERT OR IGNORE INTO {PAPER_CAPITAL_CONFIG_TABLE}
-            (id, capital, label, reset_count)
-        VALUES (1, 1000000.0, 'Default Paper Account', 0);
-    """)
+def _ensure_table() -> None:
+    """Create paper_capital_config table if it doesn't exist via db_write."""
+    from src.db.queue_writer import db_write
+    try:
+        db_write(f"""
+            CREATE TABLE IF NOT EXISTS {PAPER_CAPITAL_CONFIG_TABLE} (
+                id          INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+                capital     DOUBLE  NOT NULL DEFAULT 1000000.0,
+                label       VARCHAR DEFAULT 'Default Paper Account',
+                set_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                reset_count INTEGER DEFAULT 0
+            );
+        """, sync=True)
+        db_write(f"""
+            INSERT OR IGNORE INTO {PAPER_CAPITAL_CONFIG_TABLE}
+                (id, capital, label, reset_count)
+            VALUES (1, 1000000.0, 'Default Paper Account', 0);
+        """, sync=True)
+    except Exception as e:
+        logger.warning(f"Could not ensure paper_capital_config table: {e}")
 
 
 def get_paper_capital(conn=None) -> float:
@@ -45,13 +48,11 @@ def get_paper_capital(conn=None) -> float:
 
     def _read(c) -> float:
         try:
-            _ensure_table(c)
             row = c.execute(
                 f"SELECT capital FROM {PAPER_CAPITAL_CONFIG_TABLE} WHERE id = 1"
             ).fetchone()
             return float(row[0]) if row and row[0] and float(row[0]) > 0 else float(settings.ALGO_ALLOCATED_CAPITAL)
-        except Exception as e:
-            logger.warning(f"Could not read paper capital config: {e}. Using settings default.")
+        except Exception:
             return float(settings.ALGO_ALLOCATED_CAPITAL)
 
     if conn is not None:
@@ -79,11 +80,10 @@ def set_paper_capital(new_capital: float, label: str = "") -> Tuple[bool, str]:
         return False, "Capital too high. Maximum allowed is ₹1 Crore."
 
     from src.db.queue_writer import db_write
-    from src.db.session import get_read_connection
+    from src.db.queue_writer import db_write
 
     try:
-        with get_read_connection() as c:
-            _ensure_table(c)
+        _ensure_table()
 
         label = label.strip() or f"Custom ₹{new_capital:,.0f} Account"
         db_write(
@@ -138,8 +138,8 @@ def reset_paper_portfolio(new_capital: Optional[float] = None, label: str = "") 
     from src.db.session import get_read_connection
 
     try:
+        _ensure_table()
         with get_read_connection() as c:
-            _ensure_table(c)
             current_capital = get_paper_capital(c)
             reset_count_row = c.execute(
                 f"SELECT reset_count FROM {PAPER_CAPITAL_CONFIG_TABLE} WHERE id = 1"
@@ -228,7 +228,6 @@ def get_paper_capital_info(conn=None) -> dict:
 
     def _read(c) -> dict:
         try:
-            _ensure_table(c)
             row = c.execute(
                 f"SELECT capital, label, set_at, reset_count FROM {PAPER_CAPITAL_CONFIG_TABLE} WHERE id = 1"
             ).fetchone()
@@ -239,8 +238,8 @@ def get_paper_capital_info(conn=None) -> dict:
                     "set_at": str(row[2]) if row[2] else "Unknown",
                     "reset_count": int(row[3]) if row[3] else 0,
                 }
-        except Exception as e:
-            logger.warning(f"Could not read paper capital info: {e}")
+        except Exception:
+            pass
         return {
             "capital": float(settings.ALGO_ALLOCATED_CAPITAL),
             "label": "Default (from .env)",
