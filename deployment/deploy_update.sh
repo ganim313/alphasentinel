@@ -34,24 +34,14 @@ source "$APP_DIR/venv/bin/activate"
 pip install -q -r requirements.txt
 echo "      Dependencies up to date."
 
-# 4. Apply DB schema migrations (safe: uses CREATE TABLE IF NOT EXISTS)
-echo "[4/6] Applying DB schema (safe, idempotent)..."
+# 4. Apply DB schema migrations (safe: uses init_db with portalocker)
+echo "[4/6] Applying DB schema & migrations..."
 python -c "
 import sys
 sys.path.insert(0, '.')
-from src.db.session import get_read_connection
-with get_read_connection() as conn:
-    with open('src/db/schema.sql', 'r') as f:
-        schema = f.read()
-    # Run each statement individually for DuckDB compatibility
-    stmts = [s.strip() for s in schema.split(';') if s.strip()]
-    for stmt in stmts:
-        try:
-            conn.execute(stmt)
-        except Exception as e:
-            if 'already exists' not in str(e).lower():
-                print(f'  Schema warning: {e}')
-print('  DB schema applied.')
+from src.db.session import init_db
+init_db()
+print('  DB schema & migrations applied successfully.')
 " 2>&1 | tee -a "$LOG_FILE"
 
 # 5. Initialize paper_capital_config table (new in this release)
@@ -59,11 +49,9 @@ echo "[5/6] Initialising paper capital config table..."
 python -c "
 import sys
 sys.path.insert(0, '.')
-from src.db.session import get_read_connection
 from src.portfolio.paper_capital import get_paper_capital_info
-with get_read_connection() as conn:
-    info = get_paper_capital_info(conn)
-    print(f'  Paper capital: Rs.{info[\"capital\"]:,.0f} ({info[\"label\"]})')
+info = get_paper_capital_info()
+print(f'  Paper capital: Rs.{info[\"capital\"]:,.0f} ({info[\"label\"]})')
 " 2>&1 | tee -a "$LOG_FILE"
 
 # 6. Restart services
