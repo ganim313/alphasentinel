@@ -13,18 +13,20 @@ import numpy as np
 
 from src.db.session import get_read_connection
 from src.screening.ml_features import extract_quantitative_features
+from src.risk.daily_drawdown_guard import is_daily_drawdown_breached
 
 logger = logging.getLogger(__name__)
 
 MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "xgboost_global.pkl"
-FEATURE_COLS = ['sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster']
+FEATURE_COLS = ['sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster',
+                'delivery_ratio', 'adtv_log', 'momentum_6m']
 
 _cached_model = None
 _model_loaded = False
 
 
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Extracts the 6 Minervini strategy-aligned quantitative features."""
+    """Extracts the 9 Minervini strategy-aligned quantitative features (6 core + 3 optional)."""
     return extract_quantitative_features(df)
 
 
@@ -58,7 +60,36 @@ def evaluate_second_opinion(symbol: str, conn=None, live_price: float = None, li
     Evaluates whether a symbol passes the Second Opinion ML Consensus Gate.
     Returns True if ML Probability > 0.50, False otherwise.
     Fails closed (False) if model is missing or data is insufficient (< 50 bars).
+
+    Pre-checks (run before ML inference):
+      1. Daily drawdown kill-switch – blocks all new entries if today's portfolio
+         has drawn down more than the configured threshold (default 3 %).
     """
+    # ------------------------------------------------------------------
+    # Pre-check 1: Daily Drawdown Kill-Switch
+    # ------------------------------------------------------------------
+    try:
+        _threshold_pct = 3.0
+        try:
+            import yaml
+            from pathlib import Path as _Path
+            _cfg_path = _Path(__file__).resolve().parent.parent / "config" / "strategy.yaml"
+            with open(_cfg_path, "r", encoding="utf-8") as _f:
+                _cfg = yaml.safe_load(_f)
+            _threshold_pct = float(_cfg.get("risk", {}).get("daily_drawdown_halt_pct", 3.0))
+        except Exception:
+            pass  # Silently fall back to default; guard itself also has a fallback
+
+        breached, dd_reason = is_daily_drawdown_breached(threshold_pct=_threshold_pct)
+        if breached:
+            logger.warning(
+                f"[{symbol}] Second opinion BLOCKED by daily drawdown kill-switch: {dd_reason}"
+            )
+            return False
+    except Exception as _dd_err:
+        # Fail open on monitoring error — do not block trading
+        logger.error(f"[{symbol}] Daily drawdown guard raised unexpectedly: {_dd_err}. Continuing.")
+
     model = get_champion_model()
     if model is None:
         logger.warning(f"[{symbol}] Second opinion failed: Champion model is None (failing closed).")

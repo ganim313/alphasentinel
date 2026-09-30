@@ -33,3 +33,5 @@ risk:
   sector_exposure:
     max_open_positions: 3
     max_portfolio_pct: 25.0
+  min_conviction_score: 6.5
+  daily_drawdown_halt_pct: 3.0

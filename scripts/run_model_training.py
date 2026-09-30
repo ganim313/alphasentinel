@@ -28,7 +28,8 @@ MODEL_DIR = Path(__file__).parent.parent / "models"
 MODEL_PATH = MODEL_DIR / "xgboost_global.pkl"
 META_PATH = MODEL_DIR / "xgboost_global_meta.json"
 
-FEATURE_COLS = ['sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster']
+FEATURE_COLS = ['sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster',
+                'delivery_ratio', 'adtv_log', 'momentum_6m']
 
 
 def register_strategy_trial(strategy_name: str, config_dict: dict) -> int:
@@ -123,8 +124,13 @@ def triple_barrier_label(
 
 def extract_features_and_labels(df: pd.DataFrame, bench_features: pd.DataFrame) -> pd.DataFrame:
     """
-    Computes canonical 6 quantitative features and triple-barrier binary targets
+    Computes canonical 9 quantitative features and triple-barrier binary targets
     for a single symbol DataFrame sorted by trade_date.
+
+    Core features (6): sharpe_rank, dist_high, market_regime, rel_rsi, ema_dist, vol_cluster
+    Optional features (3): delivery_ratio, adtv_log, momentum_6m
+    Neutral fallbacks are used for the optional features when source columns are absent,
+    preserving backward compatibility with old 6-feature model checkpoints.
     """
     df = df.copy()
     close = df['close_price']
@@ -161,6 +167,21 @@ def extract_features_and_labels(df: pd.DataFrame, bench_features: pd.DataFrame) 
     df['market_regime'] = df['market_regime'].ffill().bfill().fillna(1).astype(int)
     bench_rsi = df['benchmark_rsi'].ffill().bfill().fillna(50.0)
     df['rel_rsi'] = df['rsi'] - bench_rsi
+
+    # 7. delivery_ratio (OPTIONAL): delivery_pct normalised to 0-1 range.
+    # bhavcopy_daily carries delivery_pct; neutral 0.5 used when absent.
+    if 'delivery_pct' in df.columns:
+        df['delivery_ratio'] = (df['delivery_pct'] / 100.0).clip(0, 1)
+    else:
+        df['delivery_ratio'] = 0.5
+
+    # 8. adtv_log (OPTIONAL): log of 20-day average daily traded value.
+    # volume column is aliased as 'volume' from total_traded_qty in the SQL query above.
+    vol_col = df['volume'] if 'volume' in df.columns else pd.Series(0, index=df.index)
+    df['adtv_log'] = np.log1p((close * vol_col).rolling(20, min_periods=5).mean())
+
+    # 9. momentum_6m (OPTIONAL): 6-month (126-day) price return.
+    df['momentum_6m'] = close.pct_change(126)
 
     # P3-3: Triple-Barrier Path-Dependent Labeling
     max_days = 5
@@ -245,7 +266,30 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
 
     full_df = pd.concat(all_features, ignore_index=True)
     full_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    clean_df = full_df.dropna(subset=FEATURE_COLS + ['target']).copy()
+
+    # Backward-compatible feature selection: if an existing champion model was trained on
+    # fewer features (e.g. the original 6), restrict to its known feature set so the
+    # validation gate compares apples-to-apples. New training runs will always use all 9.
+    effective_feature_cols = FEATURE_COLS
+    if MODEL_PATH.exists():
+        try:
+            with open(MODEL_PATH, "rb") as _f:
+                _existing_model = pickle.load(_f)
+            existing_features = getattr(_existing_model, 'feature_names_in_', None)
+            if existing_features is not None and len(existing_features) < len(FEATURE_COLS):
+                effective_feature_cols = list(existing_features)
+                logger.info(
+                    f"Existing champion model uses {len(effective_feature_cols)} features. "
+                    f"Backward-compat mode: training with {effective_feature_cols}."
+                )
+        except Exception as _e:
+            logger.warning(f"Could not inspect existing model features: {_e}. Using full {len(FEATURE_COLS)}-feature set.")
+
+    clean_df = full_df.dropna(subset=effective_feature_cols + ['target']).copy()
+    # Fill optional features that are still NaN (e.g. momentum_6m for short histories)
+    for col, neutral in [('delivery_ratio', 0.5), ('adtv_log', 0.0), ('momentum_6m', 0.0)]:
+        if col in clean_df.columns:
+            clean_df[col] = clean_df[col].fillna(neutral)
     clean_df['target'] = clean_df['target'].astype(int)
 
     # Check minimum target variance
@@ -266,7 +310,7 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
     
     # Register strategy parameter configuration for DSR/PBO tracking
     training_config = {
-        "features": FEATURE_COLS,
+        "features": effective_feature_cols,
         "n_splits": n_splits,
         "embargo_days": embargo_days,
         "auc_gate": 0.51,
@@ -297,9 +341,9 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
             logger.warning(f"Fold {fold_idx}: Skipped due to single class in split.")
             continue
 
-        X_tr = train_fold[FEATURE_COLS]
+        X_tr = train_fold[effective_feature_cols]
         y_tr = train_fold['target']
-        X_te = test_fold[FEATURE_COLS]
+        X_te = test_fold[effective_feature_cols]
         y_te = test_fold['target']
 
         fold_model = xgb.XGBClassifier(
@@ -356,7 +400,7 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
         random_state=42,
         eval_metric="logloss"
     )
-    final_model.fit(clean_df[FEATURE_COLS], clean_df['target'])
+    final_model.fit(clean_df[effective_feature_cols], clean_df['target'])
 
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(final_model, f)
@@ -376,7 +420,7 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
         "n_folds": n_splits,
         "embargo_days": embargo_days,
         "validation_gate": "conservative_auc > 0.51",
-        "features": FEATURE_COLS,
+        "features": effective_feature_cols,
         "n_strategy_trials": n_trials,
         "git_commit": git_commit,
         "benchmark_symbol": BENCHMARK_SYMBOL

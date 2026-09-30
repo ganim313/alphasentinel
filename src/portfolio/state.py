@@ -13,7 +13,19 @@ from src.db.session import get_read_connection
 
 logger = logging.getLogger(__name__)
 
-INITIAL_CAPITAL: float = settings.ALGO_ALLOCATED_CAPITAL
+def _load_initial_capital() -> float:
+    """
+    Loads the authoritative paper capital from DuckDB (paper_capital_config table).
+    Falls back to settings.ALGO_ALLOCATED_CAPITAL if the table is unavailable on first boot.
+    This ensures any capital configured via the dashboard is used everywhere.
+    """
+    try:
+        from src.portfolio.paper_capital import get_paper_capital
+        return get_paper_capital()
+    except Exception:
+        return float(settings.ALGO_ALLOCATED_CAPITAL)
+
+INITIAL_CAPITAL: float = _load_initial_capital()
 
 
 def get_portfolio_state(conn=None) -> Dict[str, Any]:
@@ -85,8 +97,13 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
             logger.debug(f"Could not compute open positions value: {e}")
             open_positions_value = 0.0
 
-        # 4. Core live equity & available cash
-        initial_capital = float(getattr(settings, "ALGO_ALLOCATED_CAPITAL", INITIAL_CAPITAL))
+        # 4. Core live equity & available cash — refresh capital dynamically
+        # so any capital change via dashboard takes effect without a restart
+        try:
+            from src.portfolio.paper_capital import get_paper_capital
+            initial_capital = get_paper_capital(db_conn)
+        except Exception:
+            initial_capital = float(getattr(settings, "ALGO_ALLOCATED_CAPITAL", INITIAL_CAPITAL))
         core_equity = initial_capital + realized_pnl_total + unrealized_pnl_total
         available_cash = core_equity - open_positions_value
 

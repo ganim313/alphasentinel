@@ -278,6 +278,44 @@ CONVICTION_SCORE: [e.g. 7.5]"""
     }
 
 
+def conviction_gate_node(state: AgentState) -> Dict[str, Any]:
+    """
+    Conviction Score Gate: Hard minimum threshold enforced AFTER research judge.
+    Reads min_conviction_score from src/config/strategy.yaml (default: 6.5).
+    Rejects the trade if the conviction score falls below the configured threshold.
+    LLM cost has already been spent; this node prevents low-confidence orders from leaking
+    through to order execution.
+    """
+    symbol = state.get("symbol", "UNKNOWN")
+    score = state.get("conviction_score", 5.0)
+
+    # Load threshold from strategy.yaml; fall back to 6.5 if unavailable
+    threshold = 6.5
+    try:
+        import yaml
+        from pathlib import Path
+        _config_path = Path(__file__).resolve().parent.parent / "config" / "strategy.yaml"
+        with open(_config_path, "r", encoding="utf-8") as _f:
+            _cfg = yaml.safe_load(_f)
+        threshold = float(_cfg.get("risk", {}).get("min_conviction_score", 6.5))
+    except Exception as _e:
+        logger.warning(f"[{symbol}] Could not load min_conviction_score from strategy.yaml: {_e}. Using default 6.5.")
+
+    if score < threshold:
+        reason = f"Conviction score {score}/10 below minimum threshold {threshold}/10"
+        logger.warning(f"[{symbol}] Conviction Gate REJECT: {reason}")
+        return {
+            "risk_verdict": "REJECT",
+            "rejection_reason": reason,
+            "messages": [AIMessage(content=f"CONVICTION GATE ({symbol}): REJECT. {reason}")]
+        }
+
+    logger.info(f"[{symbol}] Conviction Gate PASS: score {score}/10 >= threshold {threshold}/10")
+    return {
+        "messages": [AIMessage(content=f"CONVICTION GATE ({symbol}): PASS. Score {score}/10 >= {threshold}/10")]
+    }
+
+
 def risk_router(state: AgentState) -> str:
     """
     Gatekeeper routing: Only proceed to multi-agent LLM debate if deterministic risk passes.
@@ -292,6 +330,10 @@ def risk_router(state: AgentState) -> str:
 def build_debate_graph(checkpointer: Optional[MemorySaver] = None):
     """
     Constructs and compiles the full LangGraph debate pipeline.
+
+    Graph flow:
+        deterministic_risk → (APPROVE) → bull_analyst → bear_hunter → research_judge → conviction_gate → END
+        deterministic_risk → (REJECT)  → END
     """
     workflow = StateGraph(AgentState)
     
@@ -300,6 +342,7 @@ def build_debate_graph(checkpointer: Optional[MemorySaver] = None):
     workflow.add_node("bull_analyst", bull_analyst_node)
     workflow.add_node("bear_hunter", bear_hunter_node)
     workflow.add_node("research_judge", research_judge_node)
+    workflow.add_node("conviction_gate", conviction_gate_node)
     
     # Set Entry Point
     workflow.set_entry_point("deterministic_risk")
@@ -314,10 +357,11 @@ def build_debate_graph(checkpointer: Optional[MemorySaver] = None):
         }
     )
     
-    # Sequential Adversarial Flow: Bull -> Bear -> Judge -> End
+    # Sequential Adversarial Flow: Bull -> Bear -> Judge -> Conviction Gate -> End
     workflow.add_edge("bull_analyst", "bear_hunter")
     workflow.add_edge("bear_hunter", "research_judge")
-    workflow.add_edge("research_judge", END)
+    workflow.add_edge("research_judge", "conviction_gate")
+    workflow.add_edge("conviction_gate", END)
     
     # Compile with Checkpointer (Default to MemorySaver if none provided)
     active_checkpointer = checkpointer or MemorySaver()

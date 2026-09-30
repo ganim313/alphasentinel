@@ -225,6 +225,104 @@ with col4:
 st.divider()
 
 # -------------------------------------------------------------
+# 💰 Paper Capital Control Panel
+# Inject any dummy capital amount and reset the portfolio to
+# simulate exactly what happens when real money is deployed.
+# -------------------------------------------------------------
+from src.portfolio.paper_capital import (
+    get_paper_capital_info, set_paper_capital, reset_paper_portfolio
+)
+
+with st.expander("💰 Paper Capital Control — Inject Dummy Money", expanded=False):
+    try:
+        cap_info = get_paper_capital_info()
+    except Exception as _ce:
+        cap_info = {"capital": 1_000_000.0, "label": "Default", "set_at": "N/A", "reset_count": 0}
+
+    pc_col1, pc_col2, pc_col3 = st.columns([2, 2, 1])
+    pc_col1.metric(
+        "🏦 Current Paper Capital",
+        f"₹{cap_info['capital']:,.0f}",
+        help="This is the starting capital the system uses for all position sizing and risk calculations."
+    )
+    pc_col2.metric("📋 Session Label", cap_info["label"])
+    pc_col3.metric("🔄 Total Resets", cap_info["reset_count"])
+
+    st.caption(f"Capital last set: {cap_info['set_at']}")
+    st.markdown("---")
+
+    # --- Section 1: Change capital without resetting positions ---
+    st.markdown("**⚙️ Change Capital (keeps existing positions)**")
+    cap_options = {
+        "₹50,000 (Small test)": 50_000,
+        "₹1,00,000 (₹1 Lakh)": 1_00_000,
+        "₹2,00,000 (₹2 Lakhs)": 2_00_000,
+        "₹5,00,000 (₹5 Lakhs)": 5_00_000,
+        "₹10,00,000 (₹10 Lakhs — Default)": 10_00_000,
+        "₹25,00,000 (₹25 Lakhs)": 25_00_000,
+        "₹50,00,000 (₹50 Lakhs)": 50_00_000,
+        "Custom amount...": -1,
+    }
+    sc_col1, sc_col2 = st.columns([2, 1])
+    selected_preset = sc_col1.selectbox(
+        "Select capital amount", list(cap_options.keys()),
+        index=list(cap_options.keys()).index("₹10,00,000 (₹10 Lakhs — Default)")
+    )
+    preset_val = cap_options[selected_preset]
+    if preset_val == -1:
+        custom_val = sc_col1.number_input(
+            "Enter custom amount (₹)", min_value=10_000, max_value=1_00_00_000,
+            value=int(cap_info["capital"]), step=10_000
+        )
+        final_capital = custom_val
+    else:
+        final_capital = preset_val
+
+    cap_label = sc_col2.text_input("Session label (optional)", placeholder="e.g. Test ₹2L scenario")
+
+    if sc_col1.button("✅ Apply Capital Change", key="btn_set_capital"):
+        ok, msg = set_paper_capital(final_capital, cap_label)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
+        st.rerun()
+
+    st.markdown("---")
+
+    # --- Section 2: Full portfolio reset with new capital ---
+    st.markdown("**🔴 Full Portfolio Reset (closes all open positions + sets new capital)**")
+    st.warning(
+        "⚠️ This will mark all open positions as MANUALLY_CLOSED at entry price (zero P&L), "
+        "clear the screener queue, and start a fresh paper session. "
+        "Use this to cleanly simulate deploying real money from zero."
+    )
+    rs_col1, rs_col2 = st.columns([2, 1])
+    reset_capital_opt = rs_col1.selectbox(
+        "Reset with capital", list(cap_options.keys()),
+        key="reset_cap_select",
+        index=list(cap_options.keys()).index("₹10,00,000 (₹10 Lakhs — Default)")
+    )
+    reset_cap_val = cap_options[reset_capital_opt]
+    if reset_cap_val == -1:
+        reset_cap_val = rs_col1.number_input(
+            "Custom reset capital (₹)", min_value=10_000, max_value=1_00_00_000,
+            value=int(cap_info["capital"]), step=10_000, key="reset_custom"
+        )
+    reset_label = rs_col2.text_input("Reset label", placeholder="e.g. Live simulation run", key="reset_label")
+    confirm_reset = rs_col1.checkbox("☑️ I confirm: close all positions and start fresh")
+
+    if rs_col1.button("🔄 RESET PAPER PORTFOLIO", type="primary", disabled=not confirm_reset, key="btn_reset"):
+        ok, msg = reset_paper_portfolio(reset_cap_val, reset_label)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
+        st.rerun()
+
+st.divider()
+
+# -------------------------------------------------------------
 # Portfolio Evaluation Metrics (Phase 5)
 # -------------------------------------------------------------
 import json

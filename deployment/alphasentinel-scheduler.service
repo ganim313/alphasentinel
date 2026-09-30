@@ -5,12 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/trading-agents
-ExecStart=/home/ubuntu/trading-agents/venv/bin/python scripts/run_scheduler.py
+WorkingDirectory=/home/ubuntu/alphasentinel
+ExecStart=/home/ubuntu/alphasentinel/venv/bin/python scripts/run_scheduler.py
 Restart=always
 RestartSec=30
-StandardOutput=append:/home/ubuntu/trading-agents/logs/scheduler.log
-StandardError=append:/home/ubuntu/trading-agents/logs/scheduler.log
+StandardOutput=append:/home/ubuntu/alphasentinel/logs/scheduler.log
+StandardError=append:/home/ubuntu/alphasentinel/logs/scheduler.log
 
 [Install]
 WantedBy=multi-user.target

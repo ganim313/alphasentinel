@@ -115,7 +115,32 @@ def extract_quantitative_features(df):
     # Let's scale raw sharpe (daily) to annualized: raw * sqrt(252)
     ann_sharpe = df['sharpe_raw'] * np.sqrt(252)
     df['sharpe_rank'] = 1 / (1 + np.exp(-ann_sharpe))
-    
+
+    # 7. delivery_ratio (OPTIONAL): delivery_pct normalised to 0-1 range.
+    # Neutral value 0.5 used when delivery_pct column is absent (backward compat).
+    if 'delivery_pct' in df.columns:
+        df['delivery_ratio'] = (df['delivery_pct'] / 100.0).clip(0, 1)
+    else:
+        df['delivery_ratio'] = 0.5
+
+    # 8. adtv_log (OPTIONAL): log of 20-day average daily traded value.
+    # Log-scale is more informative for tree models than raw crores.
+    # Neutral value 0.0 (log1p(0)) when traded value data is unavailable.
+    if 'total_traded_val' in df.columns:
+        df['adtv_log'] = np.log1p(df['total_traded_val'].rolling(20, min_periods=5).mean())
+    else:
+        close_col_val = df.get('close_price', df.get('close', pd.Series(0, index=df.index)))
+        vol_col_val = df.get('total_traded_qty', df.get('volume', pd.Series(0, index=df.index)))
+        df['adtv_log'] = np.log1p((close_col_val * vol_col_val).rolling(20, min_periods=5).mean())
+
+    # 9. momentum_6m (OPTIONAL): 6-month (126-day) price return.
+    # Simple but powerful momentum signal; neutral value 0.0 if insufficient history.
+    close_col = 'close_price' if 'close_price' in df.columns else 'close'
+    if close_col in df.columns:
+        df['momentum_6m'] = df[close_col].pct_change(126)
+    else:
+        df['momentum_6m'] = 0.0
+
     # Ensure expected features exactly match
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     return df

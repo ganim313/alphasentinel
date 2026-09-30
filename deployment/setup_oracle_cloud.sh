@@ -10,7 +10,7 @@ echo "=== [1/6] Updating System & Installing Prerequisites ==="
 sudo apt-get update -y
 sudo apt-get install -y python3-pip python3-venv git curl build-essential ufw
 
-APP_DIR="/home/ubuntu/trading-agents"
+APP_DIR="/home/ubuntu/alphasentinel"
 mkdir -p "$APP_DIR/logs"
 mkdir -p "$APP_DIR/data/backups"
 

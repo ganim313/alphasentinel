@@ -5,12 +5,12 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/trading-agents
-ExecStart=/home/ubuntu/trading-agents/venv/bin/streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+WorkingDirectory=/home/ubuntu/alphasentinel
+ExecStart=/home/ubuntu/alphasentinel/venv/bin/streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
 Restart=always
 RestartSec=10
-StandardOutput=append:/home/ubuntu/trading-agents/logs/dashboard.log
-StandardError=append:/home/ubuntu/trading-agents/logs/dashboard.log
+StandardOutput=append:/home/ubuntu/alphasentinel/logs/dashboard.log
+StandardError=append:/home/ubuntu/alphasentinel/logs/dashboard.log
 
 [Install]
 WantedBy=multi-user.target
