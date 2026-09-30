@@ -225,6 +225,69 @@ with col4:
 st.divider()
 
 # -------------------------------------------------------------
+# 📡 Daily Sentinel Radar / Today's 3:15 PM Scan Summary
+# -------------------------------------------------------------
+try:
+    with get_read_connection() as conn:
+        latest_scan = conn.execute("""
+            SELECT scan_date, 
+                   COUNT(*) as total_candidates,
+                   SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) as approved_count,
+                   SUM(CASE WHEN status IN ('REJECT', 'REJECTED', 'VETOED', 'SIZING_REJECTED') THEN 1 ELSE 0 END) as rejected_count,
+                   MAX(created_at) as last_scan_time
+            FROM screener_candidates
+            GROUP BY scan_date
+            ORDER BY scan_date DESC LIMIT 1;
+        """).fetchone()
+
+        cands_today = []
+        if latest_scan:
+            scan_dt = latest_scan[0]
+            cands_today = conn.execute("""
+                SELECT sc.symbol, sc.status, sc.trigger_price, sc.rejection_reason,
+                       dt.conviction_score, dt.risk_manager_verdict
+                FROM screener_candidates sc
+                LEFT JOIN debate_transcripts dt ON sc.symbol = dt.symbol AND sc.scan_date = dt.debate_date
+                WHERE sc.scan_date = ?
+                ORDER BY sc.created_at DESC;
+            """, (scan_dt,)).fetchall()
+except Exception as _scan_err:
+    latest_scan = None
+    cands_today = []
+
+if latest_scan:
+    scan_dt, total_cands, approved_cnt, rejected_cnt, last_scan_ts = latest_scan
+    scan_time_str = last_scan_ts.strftime("%H:%M IST") if hasattr(last_scan_ts, "strftime") else "3:15 PM IST"
+    
+    if approved_cnt > 0:
+        st.success(
+            f"🎯 **Today's Sentinel Scan ({scan_dt}):** {approved_cnt} trade(s) approved and executed at {scan_time_str}! "
+            f"Check active positions in **Tab 1: 📊 Paper Portfolio** below."
+        )
+    else:
+        st.info(
+            f"🛡️ **Today's Sentinel Scan ({scan_dt} • {scan_time_str}):** "
+            f"**Capital Preserved — 0 Trades Entered.** "
+            f"Evaluated {total_cands} candidate(s); all were rejected by risk arbiter or conviction gates to avoid market chop."
+        )
+
+    # Show a concise breakdown of today's evaluated candidates
+    if cands_today:
+        with st.expander(f"📋 Review Today's Evaluated Candidates ({len(cands_today)} setups)", expanded=(approved_cnt == 0)):
+            cand_cols = st.columns(len(cands_today))
+            for i, cand in enumerate(cands_today):
+                sym, stat, trig, rej_reason, conv, verd = cand
+                with cand_cols[i]:
+                    stat_icon = "✅" if stat == "APPROVED" else "🛡️"
+                    conv_str = f"⭐️ {conv:.1f}/10" if conv and conv >= 0 else "N/A"
+                    st.markdown(f"**{stat_icon} {sym}**")
+                    st.caption(f"Trigger: ₹{trig:,.2f} | Status: `{stat}` | Conviction: {conv_str}")
+                    if rej_reason:
+                        st.caption(f"**Reason:** {rej_reason}")
+            st.caption("👉 Full transcripts & arguments available in **Tab 3: 🧠 Multi-Agent Debates**.")
+    st.divider()
+
+# -------------------------------------------------------------
 # 💰 Paper Capital Control Panel
 # Inject any dummy capital amount and reset the portfolio to
 # simulate exactly what happens when real money is deployed.
@@ -445,7 +508,11 @@ with tab1:
                     except Exception as e:
                         st.error(f"Database error while closing position: {e}")
     else:
-        st.info("No paper positions opened yet. The 03:15 PM screener will populate active setups.")
+        st.info(
+            "ℹ️ **No paper positions opened yet.**\n\n"
+            "Today's 03:15 PM scan evaluated the universe and safely vetoed all candidates to protect your capital. "
+            "Inspect evaluated candidates in **Tab 2: 🎯 Screener Candidates** and full agent transcripts in **Tab 3: 🧠 Multi-Agent Debates**."
+        )
 
 with tab_mb:
     st.subheader("🌅 Morning Pre-Market Macro Radar")
@@ -469,13 +536,12 @@ with tab2:
     try:
         with get_read_connection() as conn:
             df_screen = conn.execute("""
-                SELECT symbol, scan_date, trigger_price, 
+                SELECT symbol, scan_date, trigger_price, status, rejection_reason,
                        ROUND(ml_probability * 100, 2) || '%' AS ml_probability, 
                        pattern_type AS vcp_pattern, 
                        mr_signal, 
-                       pledge_trend_3m,
-                       shield_passed, 
-                       status 
+                       shield_passed,
+                       ab_group
                 FROM screener_candidates 
                 ORDER BY created_at DESC;
             """).df()
@@ -485,8 +551,9 @@ with tab2:
 
     if not df_screen.empty:
         def color_status(val):
-            if val == 'APPROVED': return 'color: #00FF00; font-weight: bold'
-            if val == 'REJECTED': return 'color: #FF0000'
+            if val in ('APPROVED', 'APPROVED_WITH_WARNING'): return 'color: #00FF00; font-weight: bold'
+            if val in ('REJECT', 'REJECTED', 'VETOED', 'SIZING_REJECTED', 'EXECUTION_REJECTED'): return 'color: #FF6B6B; font-weight: bold'
+            if val in ('AWAITING_TRIGGER', 'PENDING_REVIEW'): return 'color: #FFA500; font-weight: bold'
             return ''
         st.dataframe(df_screen.style.map(color_status, subset=['status']), use_container_width=True)
         
@@ -518,24 +585,30 @@ with tab_debates:
 
     if not df_debates.empty:
         for idx, row in df_debates.iterrows():
-            conviction = row.get("conviction_score") or 0.0
+            conviction = row.get("conviction_score")
+            try:
+                conv_val = float(conviction) if conviction is not None else -1.0
+            except (ValueError, TypeError):
+                conv_val = -1.0
             verdict = row.get("risk_manager_verdict") or "PENDING"
             sym = row.get("symbol")
+            icon = "✅" if verdict in ("APPROVE", "APPROVED") else "🛡️"
+            conv_display = f"⭐️ {conv_val:.1f}/10" if conv_val >= 0 else "Pre-empted (-1.0)"
             
-            with st.expander(f"🛡️ {sym} | Verdict: {verdict} | Conviction: ⭐️ {conviction:.1f}/10 | TV: {row.get('tv_technical_rating', 'N/A')}"):
+            with st.expander(f"{icon} {sym} | Verdict: {verdict} | Conviction: {conv_display} | TV: {row.get('tv_technical_rating', 'N/A')}"):
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Stop Loss", f"₹{row.get('stop_loss', 0.0):,.2f}")
                 c2.metric("Target 1", f"₹{row.get('target_1', 0.0):,.2f}")
                 c3.metric("Shares Sized", f"{row.get('suggested_shares', 0):,}")
                 
                 st.markdown("#### 🐂 Bull Analyst Thesis")
-                st.info(row.get("bull_thesis") or "No thesis recorded.")
+                st.info(row.get("bull_thesis") or "Candidate vetoed by Risk Arbiter prior to LLM debate (saved LLM tokens & preserved capital).")
                 
                 st.markdown("#### 🐻 Bear Trap Hunter Critique")
-                st.warning(row.get("bear_risks") or "No red flags recorded.")
+                st.warning(row.get("bear_risks") or "Candidate vetoed by Risk Arbiter prior to LLM debate.")
                 
                 st.markdown("#### ⚖️ Chief Research Judge Synthesis")
-                st.success(row.get("judge_synthesis") or "No synthesis recorded.")
+                st.success(row.get("judge_synthesis") or "Candidate vetoed by Risk Arbiter prior to LLM debate.")
     else:
         st.info("No debate transcripts recorded yet. Transcripts will automatically populate during the 03:15 PM screener runs.")
 
