@@ -12,6 +12,14 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# Monkeypatch aiohttp.ConnectionTimeoutError for litellm backward compatibility
+try:
+    import aiohttp
+    if not hasattr(aiohttp, "ConnectionTimeoutError"):
+        aiohttp.ConnectionTimeoutError = type("ConnectionTimeoutError", (aiohttp.ClientError,), {})
+except ImportError:
+    pass
+
 _provider_failure_ts: Dict[str, float] = {}
 _COOLDOWN_SECONDS: float = 300.0
 

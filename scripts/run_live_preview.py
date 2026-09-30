@@ -150,45 +150,8 @@ def run_live_preview_pipeline():
         logger.warning("No historical symbols found in bhavcopy_daily. Please run EOD ingestion first.")
         return
 
-    # 5. Batch fetch live 3:15 PM ticks via yfinance
-    logger.info(f"Fetching live price data for {len(symbols)} tickers...")
-    tickers_ns = [f"{s}.NS" for s in symbols]
-    live_data = {}
-    
-    chunk_size = 100
-    for i in range(0, len(tickers_ns), chunk_size):
-        chunk = tickers_ns[i:i + chunk_size]
-        try:
-            live_raw = yf.download(chunk, period="1d", progress=False)
-            if live_raw is not None and not live_raw.empty:
-                if len(chunk) == 1:
-                    sym = chunk[0].replace(".NS", "")
-                    try:
-                        c_val = live_raw['Close'].iloc[-1]
-                        v_val = live_raw['Volume'].iloc[-1]
-                        live_data[sym] = {
-                            "close": float(c_val) if pd.notna(c_val) else None,
-                            "volume": int(v_val) if pd.notna(v_val) else None
-                        }
-                    except Exception:
-                        pass
-                else:
-                    for ns_sym in chunk:
-                        sym = ns_sym.replace(".NS", "")
-                        try:
-                            if ns_sym in live_raw['Close']:
-                                c_val = live_raw['Close'][ns_sym].iloc[-1]
-                                v_val = live_raw['Volume'][ns_sym].iloc[-1]
-                                live_data[sym] = {
-                                    "close": float(c_val) if pd.notna(c_val) else None,
-                                    "volume": int(v_val) if pd.notna(v_val) else None
-                                }
-                        except Exception:
-                            pass
-        except Exception as e:
-            logger.warning(f"Live tick download error for chunk {i}: {e}")
-
-    # 6. Pass 1: Liquidity Filter & Vectorized VCP Screen
+    # 5. Pass 1: Vectorized Liquidity Filter in DuckDB (~0.4s)
+    logger.info("Evaluating liquidity guard across active universe...")
     liquid_symbols = []
     liquid_metrics_map = {}
     market_cap_tier_map = {}
@@ -208,71 +171,84 @@ def run_live_preview_pipeline():
         except Exception as e:
             logger.debug(f"Could not load fundamentals_cache for market cap: {e}")
 
+        # Batch query 30-day median turnover and latest price in DuckDB for all active symbols in 1 query (~0.3s)
+        adtv_rows = conn.execute("""
+            WITH ranked AS (
+                SELECT symbol, total_traded_val, close_price,
+                       ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY trade_date DESC) as rn
+                FROM bhavcopy_daily
+                WHERE total_traded_qty > 0 AND series != 'BE' AND series != 'BZ'
+            )
+            SELECT symbol, 
+                   MEDIAN(total_traded_val) as adtv_30d_median,
+                   COUNT(*) as data_days,
+                   MAX(CASE WHEN rn=1 THEN close_price END) as last_close
+            FROM ranked
+            WHERE rn <= 30
+            GROUP BY symbol
+        """).fetchall()
+        adtv_map = {r[0]: {"adtv": float(r[1] or 0), "days": int(r[2] or 0), "close": float(r[3] or 0)} for r in adtv_rows}
+
         for symbol in symbols:
             actual_series = series_map.get(symbol, "EQ")
+            if actual_series in ["BE", "BZ", "T2T"]:
+                continue
             circuit_band = circuit_band_map.get(symbol, 20.0)
+            if circuit_band < 5.0:
+                continue
 
-            # Determine market_cap_tier: cached fundamentals -> turnover heuristic -> default 'SMALL'
+            sym_adtv_info = adtv_map.get(symbol, {"adtv": 0.0, "days": 0, "close": 0.0})
+            if sym_adtv_info["close"] < 10.0 or sym_adtv_info["days"] < 10:
+                continue
+
             if symbol in cached_mcap_map and cached_mcap_map[symbol] > 0:
                 tier = get_market_cap_tier(cached_mcap_map[symbol])
             else:
-                # Dynamic classification heuristic using latest turnover from bhavcopy
-                try:
-                    turnover_row = conn.execute("""
-                        SELECT total_traded_val 
-                        FROM bhavcopy_daily 
-                        WHERE symbol = ? 
-                        ORDER BY trade_date DESC LIMIT 1
-                    """, (symbol,)).fetchone()
-                    if turnover_row and turnover_row[0] is not None:
-                        t_val = float(turnover_row[0])
-                        if t_val >= 500_000_000.0:    # >= ₹50 Cr
-                            tier = "LARGE"
-                        elif t_val >= 150_000_000.0:  # >= ₹15 Cr
-                            tier = "MID"
-                        elif t_val >= 25_000_000.0:   # >= ₹2.5 Cr
-                            tier = "SMALL"
-                        else:
-                            tier = "SMALL"
-                    else:
-                        tier = "SMALL"
-                except Exception:
+                t_val = sym_adtv_info["adtv"]
+                if t_val >= 500_000_000.0:
+                    tier = "LARGE"
+                elif t_val >= 150_000_000.0:
+                    tier = "MID"
+                elif t_val >= 25_000_000.0:
+                    tier = "SMALL"
+                else:
                     tier = "SMALL"
 
             market_cap_tier_map[symbol] = tier
-
-            is_liquid, l_reason, l_metrics = check_liquidity_and_executability(
-                symbol, series=actual_series, circuit_band_pct=circuit_band, market_cap_tier=tier, conn=conn
-            )
-            if is_liquid:
+            adtv_floor = 2500000.0  # ₹25 Lakhs floor
+            if sym_adtv_info["adtv"] >= adtv_floor:
                 liquid_symbols.append(symbol)
-                liquid_metrics_map[symbol] = l_metrics
-                logger.debug(f"[{symbol}] Passed Liquidity Guard: Tier={tier}, ADTV=₹{l_metrics.get('adtv_20d_rupees', 0):,.0f}")
+                liquid_metrics_map[symbol] = {
+                    "symbol": symbol,
+                    "series": actual_series,
+                    "adtv_20d_rupees": sym_adtv_info["adtv"],
+                    "data_days": sym_adtv_info["days"],
+                    "circuit_band_pct": circuit_band,
+                    "market_cap_tier": tier
+                }
 
-        batch_live_prices = {sym: live_data.get(sym, {}).get("close") for sym in liquid_symbols if live_data.get(sym, {}).get("close") is not None}
-        batch_live_volumes = {sym: live_data.get(sym, {}).get("volume") for sym in liquid_symbols if live_data.get(sym, {}).get("volume") is not None}
+        logger.info(f"Liquidity Filter complete: {len(liquid_symbols)} liquid symbols out of {len(symbols)} active universe.")
 
+        # 6. Pass 2: Technical Screener on DuckDB History
         vcp_results_list = evaluate_minervini_vcp_batch(
-            liquid_symbols, conn, live_prices=batch_live_prices, live_volumes=batch_live_volumes, batch_size=500
+            liquid_symbols, conn, batch_size=500
         )
         vcp_results_map = {res["symbol"]: res for res in vcp_results_list}
 
         candidate_pool = []
         for symbol in liquid_symbols:
-            lp = batch_live_prices.get(symbol)
-            lv = batch_live_volumes.get(symbol)
             vcp_candidate = vcp_results_map.get(symbol)
-            ml_prob = evaluate_ml_probability(symbol, conn, live_price=lp, live_volume=lv)
-            mr_signal = evaluate_mean_reversion(symbol, conn, live_price=lp)
+            mr_signal = evaluate_mean_reversion(symbol, conn)
             
             has_vcp = vcp_candidate is not None
-            if not (has_vcp or ml_prob > 0.60 or mr_signal):
+            if not (has_vcp or mr_signal):
                 continue
                 
-            cur_price = lp if lp else (vcp_candidate["current_price"] if vcp_candidate else 100.0)
+            cur_price = vcp_candidate["current_price"] if vcp_candidate else adtv_map.get(symbol, {}).get("close", 100.0)
             trig_price = vcp_candidate["trigger_price"] if vcp_candidate else cur_price * 1.015
-            pat_type = vcp_candidate["pattern_type"] if vcp_candidate else ("ML_MOMENTUM" if ml_prob > 0.60 else "MEAN_REVERSION")
+            pat_type = vcp_candidate["pattern_type"] if vcp_candidate else "MEAN_REVERSION"
             cand_tier = market_cap_tier_map.get(symbol, "SMALL")
+            ml_prob = evaluate_ml_probability(symbol, conn)
 
             candidate_pool.append({
                 "symbol": symbol,
@@ -290,9 +266,40 @@ def run_live_preview_pipeline():
                 "l_metrics": liquid_metrics_map.get(symbol, {})
             })
 
-    # Filter candidate_pool by Shariah compliance BEFORE taking top 3 (resolves P1-06)
+    # 7. Pass 3: Targeted Live 3:15 PM Ticks via Yahoo Finance ONLY for candidates (~1-2s)
+    if candidate_pool:
+        logger.info(f"Fetching live 3:15 PM ticks for {len(candidate_pool)} technical candidates...")
+        cand_tickers_ns = [f"{c['symbol']}.NS" for c in candidate_pool]
+        try:
+            live_raw = yf.download(cand_tickers_ns, period="1d", progress=False)
+            if live_raw is not None and not live_raw.empty:
+                for item in candidate_pool:
+                    sym = item["symbol"]
+                    ns_sym = f"{sym}.NS"
+                    try:
+                        if len(cand_tickers_ns) == 1:
+                            c_val = live_raw['Close'].iloc[-1]
+                        elif ns_sym in live_raw['Close']:
+                            c_val = live_raw['Close'][ns_sym].iloc[-1]
+                        else:
+                            c_val = None
+                        if c_val is not None and pd.notna(c_val) and float(c_val) > 0:
+                            item["candidate"]["current_price"] = float(c_val)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"Could not fetch live ticks for candidates: {e}")
+
+    # 8. Pass 4: Sort and Shariah Screen (Top-N with Cache First)
+    candidate_pool.sort(key=lambda x: (
+        x["has_vcp"],
+        x["candidate"]["current_price"] >= x["candidate"]["trigger_price"],
+        x["ml_prob"]
+    ), reverse=True)
+
     shariah_compliant_pool = []
-    for item in candidate_pool:
+    # Evaluate at most top 10 candidates to avoid long scraping delays
+    for item in candidate_pool[:10]:
         sym = item["symbol"]
         try:
             funds = scrape_screener_fundamentals(sym)
@@ -302,24 +309,20 @@ def run_live_preview_pipeline():
                 item["fundamentals"] = funds
                 item["sector_name"] = sec
                 shariah_compliant_pool.append(item)
+                if len(shariah_compliant_pool) >= 3:
+                    break
             else:
                 logger.info(f"[{sym}] Pre-debate exclusion by Shariah filter: {sh_reason}")
         except Exception as e:
             logger.warning(f"Failed Shariah check for {sym}: {e}")
             continue
 
-    # Sort and Hardcap to Top 3 for LLM Debate
-    shariah_compliant_pool.sort(key=lambda x: (
-        x["candidate"]["current_price"] >= x["candidate"]["trigger_price"],
-        x["ml_prob"]
-    ), reverse=True)
     top_candidates = shariah_compliant_pool[:3]
-
     logger.info(f"Pass 1 complete. Found {len(shariah_compliant_pool)} compliant technical candidates. Proceeding with Top {len(top_candidates)}.")
     for item in top_candidates:
         logger.info(f"Top Candidate: {item['symbol']} | Tier: {item.get('market_cap_tier')} | Pattern: {item['candidate']['pattern_type']} | Trigger: ₹{item['candidate']['trigger_price']:.2f}")
 
-    # 7. Pass 2: Shariah, Anti-Trap, TradingView, and LangGraph Multi-Agent Debate
+    # 9. Pass 5: Shariah, Anti-Trap, TradingView, and LangGraph Multi-Agent Debate
     debate_app = build_debate_graph()
     approved_candidates = []
 
@@ -375,29 +378,34 @@ def run_live_preview_pipeline():
             if bypass_factor < 1.0:
                 cand_macro["target_cash_exposure_pct"] = max(cand_macro.get("target_cash_exposure_pct", 0.0), 50.0)
 
+            # Sanitize fundamentals dictionary values to native python types
+            clean_fundamentals = {}
+            for k, v in {**fundamentals, "atr_14": float(real_atr)}.items():
+                if hasattr(v, 'item'):
+                    clean_fundamentals[k] = v.item()
+                else:
+                    clean_fundamentals[k] = v
+
             state_input = {
-                "symbol": symbol,
+                "symbol": str(symbol),
                 "scan_date": today_ist.isoformat(),
-                "current_price": candidate["current_price"],
-                "trigger_price": candidate["trigger_price"],
-                "market_cap_tier": tier,
-                "adtv_20d": l_metrics.get("adtv_20d_rupees", 5000000.0),
-                "circuit_band": item.get("circuit_band", 20.0),
-                "fundamentals": {
-                    **fundamentals,
-                    "atr_14": real_atr
-                },
+                "current_price": float(candidate["current_price"]),
+                "trigger_price": float(candidate["trigger_price"]),
+                "market_cap_tier": str(tier),
+                "adtv_20d": float(l_metrics.get("adtv_20d_rupees", 5000000.0)),
+                "circuit_band": float(item.get("circuit_band", 20.0)),
+                "fundamentals": clean_fundamentals,
                 "macro_weather": cand_macro,
                 "historical_memory": [],
                 "tv_technical_rating": tv_ratings,
                 "messages": [],
                 "macro_context": f"Regime: {macro_data.get('market_regime')}",
                 "current_verdict": None,
-                "vcp_signal": has_vcp,
-                "ml_probability": ml_prob,
-                "mr_signal": mr_signal,
-                "shield_passed": passed_trap,
-                "macro_regime_score": macro_data.get("macro_weather_score", 0.8),
+                "vcp_signal": bool(has_vcp),
+                "ml_probability": float(ml_prob),
+                "mr_signal": bool(mr_signal),
+                "shield_passed": bool(passed_trap),
+                "macro_regime_score": float(macro_data.get("macro_weather_score", 0.8)),
                 "bull_thesis": None,
                 "bear_risks": None,
                 "judge_synthesis": None,
@@ -444,10 +452,10 @@ def run_live_preview_pipeline():
                     ml_probability, mr_signal, shield_passed, status, rejection_reason, ab_group
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, ?, ?, ?, ?, ?, ?);
             """, (
-                cand_id, today_ist.isoformat(), symbol, sector_name, candidate["pattern_type"], candidate["trigger_price"], 
-                l_metrics.get("adtv_20d_rupees", 0), tier, item.get("circuit_band", 20.0), ml_prob, mr_signal, passed_trap, initial_status,
-                final_state.get("rejection_reason") or "",
-                ab_group
+                cand_id, today_ist.isoformat(), str(symbol), str(sector_name), str(candidate["pattern_type"]), float(candidate["trigger_price"]), 
+                float(l_metrics.get("adtv_20d_rupees", 0)), str(tier), float(item.get("circuit_band", 20.0)), float(ml_prob), bool(mr_signal), bool(passed_trap), str(initial_status),
+                str(final_state.get("rejection_reason") or ""),
+                str(ab_group)
             ), sync=True)
 
             if initial_status == "PENDING_REVIEW":
@@ -522,25 +530,60 @@ def run_live_preview_pipeline():
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """, (
                 f"deb_{symbol}_{today_ist.isoformat()}",
-                symbol,
+                str(symbol),
                 today_ist.isoformat(),
-                macro_data.get("macro_weather_score", 0.8),
-                final_state.get("bull_thesis", ""),
-                final_state.get("bear_risks", ""),
-                final_state.get("judge_synthesis", ""),
-                tv_ratings.get("recommendation", "NEUTRAL"),
-                final_state.get("conviction_score", 0.0) if final_state.get("conviction_score") is not None else -1.0,
-                final_state.get("risk_verdict") or "REJECT",
-                final_state.get("suggested_shares", 0),
-                final_state.get("stop_loss_price", 0.0),
-                final_state.get("target_1_price", 0.0),
-                final_state.get("target_2_price", 0.0)
-            ))
+                float(macro_data.get("macro_weather_score", 0.8)),
+                str(final_state.get("bull_thesis") or ""),
+                str(final_state.get("bear_risks") or ""),
+                str(final_state.get("judge_synthesis") or ""),
+                str(tv_ratings.get("recommendation", "NEUTRAL")),
+                float(final_state.get("conviction_score", 0.0) if final_state.get("conviction_score") is not None else -1.0),
+                str(final_state.get("risk_verdict") or "REJECT"),
+                int(final_state.get("suggested_shares", 0)),
+                float(final_state.get("stop_loss_price", 0.0)),
+                float(final_state.get("target_1_price", 0.0)),
+                float(final_state.get("target_2_price", 0.0))
+            ), sync=True)
         except Exception as cand_err:
             logger.error(f"Error processing candidate {symbol}: {cand_err}", exc_info=True)
             continue
 
     logger.info(f"03:15 PM Live Preview completed successfully. Approved candidates: {approved_candidates}")
+
+    # Dispatch guaranteed 3:15 PM Sentinel Scan Summary to Telegram
+    try:
+        from src.portfolio.state import get_portfolio_state
+        port_state = get_portfolio_state()
+        core_equity = port_state.get("core_equity", 1000000.0)
+    except Exception:
+        core_equity = 1000000.0
+
+    regime_val = macro_data.get("market_regime") if macro_data else 0
+    regime_desc = "🟢 Bullish (Regime 1 / Uptrend)" if regime_val != 0 else "🔴 Defensive (Regime 0 / Market Correction)"
+    
+    summary_msg = (
+        f"📊 <b>AlphaSentinel 3:15 PM Scan Summary</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• <b>Date:</b> {today_ist.strftime('%d-%b-%Y')}\n"
+        f"• <b>Market Regime:</b> {regime_desc}\n"
+        f"• <b>Liquid Universe:</b> {len(liquid_symbols)} stocks\n"
+        f"• <b>Setups Identified:</b> {len(candidate_pool)}\n"
+        f"• <b>Top Setups Debated:</b> {len(top_candidates)}\n"
+        f"• <b>Trades Approved:</b> {len(approved_candidates)} ({', '.join(approved_candidates) if approved_candidates else 'None'})\n"
+        f"• <b>Portfolio Capital:</b> ₹{core_equity:,.2f}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    if approved_candidates:
+        summary_msg += f"✅ <b>Active Orders:</b> Placed in paper portfolio. See Trade Cards."
+    else:
+        summary_msg += f"🛡️ <b>Capital Preserved:</b> All gates held firm. No forced trades."
+
+    try:
+        from src.notification.telegram_bot import send_telegram_alert
+        send_telegram_alert(summary_msg)
+        logger.info("Dispatched 3:15 PM summary alert to Telegram.")
+    except Exception as tg_err:
+        logger.warning(f"Failed to dispatch daily summary alert to Telegram: {tg_err}")
 
 
 if __name__ == "__main__":
