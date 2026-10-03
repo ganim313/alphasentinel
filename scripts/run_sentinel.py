@@ -24,8 +24,7 @@ logger = logging.getLogger("run_sentinel")
 
 def run_sentinel_check():
     if is_system_halted():
-        logger.warning("System is currently HALTED. Sentinel is in idle standby.")
-        return
+        logger.warning("System is currently HALTED. Sentinel running in DEFENSIVE EXIT-ONLY mode for open positions.")
 
     logger.info("Running 15-minute Trailing Stop-Loss Sentinel check...")
 

@@ -59,7 +59,7 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
         unrealized_res = db_conn.execute("""
             SELECT COALESCE(SUM(unrealized_pnl), 0.0)
             FROM positions
-            WHERE status IN ('OPEN', 'TARGET_1_TRIMMED')
+            WHERE status IN ('OPEN', 'TARGET_1_TRIMMED', 'MARKED_FOR_CLOSURE')
               AND unrealized_pnl IS NOT NULL
         """).fetchone()
         unrealized_pnl_total = float(unrealized_res[0]) if unrealized_res and unrealized_res[0] is not None else 0.0
@@ -90,7 +90,7 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
                 open_val_res = db_conn.execute(f"""
                     SELECT COALESCE(SUM({price_expr} * quantity), 0.0)
                     FROM positions
-                    WHERE status IN ('OPEN', 'TARGET_1_TRIMMED')
+                    WHERE status IN ('OPEN', 'TARGET_1_TRIMMED', 'MARKED_FOR_CLOSURE')
                 """).fetchone()
                 open_positions_value = float(open_val_res[0]) if open_val_res and open_val_res[0] is not None else 0.0
         except Exception as e:

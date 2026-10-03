@@ -67,8 +67,7 @@ def log_shariah_purification(trade_id: str, symbol: str, profit: float, conn=Non
 
 def run_eod_reconciliation_pipeline():
     if is_system_halted():
-        logger.warning("System is currently HALTED. Aborting EOD reconciliation.")
-        return
+        logger.warning("System is currently HALTED. Running EOD reconciliation in DEFENSIVE EXIT/RECONCILIATION mode.")
 
     logger.info("Executing 06:00 PM EOD Reconciliation Pipeline...")
 

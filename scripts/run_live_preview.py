@@ -35,7 +35,7 @@ from src.screening.shariah_filter import check_shariah_compliance
 from src.screening.vcp_screener import evaluate_minervini_vcp_batch
 from src.screening.anti_trap_shield import evaluate_anti_trap_shield
 from src.screening.ml_predictor import evaluate_ml_probability
-from src.screening.mean_reversion_screener import evaluate_mean_reversion
+from src.screening.mean_reversion_screener import evaluate_mean_reversion, evaluate_mean_reversion_batch
 from src.ingestion.screener_scraper import scrape_screener_fundamentals
 from src.ingestion.macro_feeds import fetch_macro_weather_data
 from src.ingestion.tradingview import get_tradingview_technical_ratings
@@ -234,23 +234,23 @@ def run_live_preview_pipeline():
             liquid_symbols, conn, batch_size=500
         )
         vcp_results_map = {res["symbol"]: res for res in vcp_results_list}
+        mr_results_map = evaluate_mean_reversion_batch(liquid_symbols, conn)
 
-        candidate_pool = []
+        raw_candidates = []
         for symbol in liquid_symbols:
             vcp_candidate = vcp_results_map.get(symbol)
-            mr_signal = evaluate_mean_reversion(symbol, conn)
-            
+            mr_signal = mr_results_map.get(symbol, False)
+
             has_vcp = vcp_candidate is not None
             if not (has_vcp or mr_signal):
                 continue
-                
+
             cur_price = vcp_candidate["current_price"] if vcp_candidate else adtv_map.get(symbol, {}).get("close", 100.0)
             trig_price = vcp_candidate["trigger_price"] if vcp_candidate else cur_price * 1.015
             pat_type = vcp_candidate["pattern_type"] if vcp_candidate else "MEAN_REVERSION"
             cand_tier = market_cap_tier_map.get(symbol, "SMALL")
-            ml_prob = evaluate_ml_probability(symbol, conn)
 
-            candidate_pool.append({
+            raw_candidates.append({
                 "symbol": symbol,
                 "candidate": {
                     "pattern_type": pat_type,
@@ -260,11 +260,26 @@ def run_live_preview_pipeline():
                 },
                 "circuit_band": circuit_band_map.get(symbol, 20.0),
                 "market_cap_tier": cand_tier,
-                "ml_prob": ml_prob,
+                "ml_prob": 0.0,
                 "mr_signal": mr_signal,
                 "has_vcp": has_vcp,
                 "l_metrics": liquid_metrics_map.get(symbol, {})
             })
+
+        logger.info(f"Pass 2 preliminary technical screen found {len(raw_candidates)} candidates.")
+
+        # Sort candidates to prioritize high-conviction setups before ML scoring
+        raw_candidates.sort(key=lambda x: (
+            x["has_vcp"],
+            x["candidate"]["current_price"] >= x["candidate"]["trigger_price"],
+            x["candidate"]["current_price"] / max(x["candidate"]["trigger_price"], 1e-6),
+            x["l_metrics"].get("adtv_20d_rupees", 0.0)
+        ), reverse=True)
+
+        # Defer ML probability: evaluate only the top 15 candidates before Shariah screening
+        candidate_pool = raw_candidates[:15]
+        for item in candidate_pool:
+            item["ml_prob"] = evaluate_ml_probability(item["symbol"], conn)
 
     # 7. Pass 3: Targeted Live 3:15 PM Ticks via Yahoo Finance ONLY for candidates (~1-2s)
     if candidate_pool:
@@ -298,8 +313,8 @@ def run_live_preview_pipeline():
     ), reverse=True)
 
     shariah_compliant_pool = []
-    # Evaluate at most top 10 candidates to avoid long scraping delays
-    for item in candidate_pool[:10]:
+    # Evaluate candidates (up to top 15 in pool) until 3 compliant candidates found
+    for item in candidate_pool:
         sym = item["symbol"]
         try:
             funds = scrape_screener_fundamentals(sym)

@@ -194,7 +194,14 @@ def test_live_preview_falls_back_to_live_fetch_when_db_absent():
         "source": "FALLBACK_LIVE"
     }
 
+    fake_now = datetime.datetime(2026, 9, 30, 15, 15, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+    class FakeDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fake_now
+
     with patch("scripts.run_live_preview.fetch_macro_weather_data", return_value=mock_live) as mock_fetch, \
+         patch("scripts.run_live_preview.datetime.datetime", FakeDatetime), \
          patch("scripts.run_live_preview.is_nse_holiday", return_value=False), \
          patch("scripts.run_live_preview.is_system_halted", return_value=False), \
          patch("scripts.run_live_preview.get_active_universe", return_value=[]):

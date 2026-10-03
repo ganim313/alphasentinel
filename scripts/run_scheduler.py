@@ -99,8 +99,14 @@ def run_script(script_name: str, timeout_seconds: int = 600) -> bool:
                 f"--- STDOUT ---\n{proc.stdout[-500:].strip() if proc.stdout else ''}"
             )
             return False
-    except subprocess.TimeoutExpired:
-        logger.error(f"==> [TIMEOUT] Task {script_name} timed out after {timeout_seconds}s.")
+    except subprocess.TimeoutExpired as e:
+        stdout_tail = (e.stdout[-1000:].decode(errors="replace") if isinstance(e.stdout, bytes) else str(e.stdout or "")[-1000:]).strip()
+        stderr_tail = (e.stderr[-1000:].decode(errors="replace") if isinstance(e.stderr, bytes) else str(e.stderr or "")[-1000:]).strip()
+        logger.error(
+            f"==> [TIMEOUT] Task {script_name} timed out after {timeout_seconds}s.\n"
+            f"--- STDERR (Tail) ---\n{stderr_tail}\n"
+            f"--- STDOUT (Tail) ---\n{stdout_tail}"
+        )
         return False
     except Exception as e:
         logger.error(f"==> [ERROR] Exception executing {script_name}: {e}")
@@ -145,7 +151,7 @@ def job_live_preview():
         logger.info("Today is an official NSE trading holiday. Skipping 3:15 PM screening.")
         return
     logger.info("Triggering 03:15 PM Live Screening & Debate Preview asynchronously...")
-    t = threading.Thread(target=run_script, args=("run_live_preview.py", 900), daemon=True)
+    t = threading.Thread(target=run_script, args=("run_live_preview.py", 1200), daemon=True)
     t.start()
 
 

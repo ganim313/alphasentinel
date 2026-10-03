@@ -24,6 +24,7 @@ from src.utils.holidays import is_nse_holiday
 from src.execution.order_manager import PaperBroker
 from src.risk.arbiter import calculate_deterministic_risk_and_position
 from src.config.settings import settings
+from src.portfolio.paper_capital import get_paper_capital
 import yfinance as yf
 
 logger = logging.getLogger("run_trigger_watcher")
@@ -95,6 +96,7 @@ def check_and_execute_triggers() -> int:
                 else:
                     atr_val = current_p * 0.025
 
+                current_capital = get_paper_capital()
                 risk_calc = calculate_deterministic_risk_and_position(
                     symbol=sym,
                     trigger_price=trigger_p,
@@ -105,11 +107,18 @@ def check_and_execute_triggers() -> int:
                     adtv_20d=5000000.0,
                     sector=sector or "",
                     market_cap_tier=mcap_tier or "SMALL",
-                    portfolio_capital_rupees=settings.ALGO_ALLOCATED_CAPITAL
+                    portfolio_capital_rupees=current_capital
                 )
-                qty = risk_calc.get("suggested_shares", 0)
+                try:
+                    qty = int(risk_calc.get("suggested_shares", 0) or 0)
+                except (ValueError, TypeError):
+                    qty = 0
+
                 if qty <= 0:
-                    qty = max(1, int((settings.ALGO_ALLOCATED_CAPITAL * 0.02) / current_p))
+                    rej_reason = risk_calc.get("rejection_reason", "Risk arbiter allocated 0 shares")
+                    logger.warning(f"[{sym}] Risk arbiter allocated 0 shares. Rejecting candidate: {rej_reason}")
+                    db_write("UPDATE screener_candidates SET status = 'EXECUTION_REJECTED' WHERE id = ?", (cand_id,))
+                    continue
 
                 broker = PaperBroker()
                 order_id = broker.place_order(
