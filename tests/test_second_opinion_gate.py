@@ -19,12 +19,15 @@ def test_model_path_and_feature_cols():
     expected_path = Path(gate.__file__).parent.parent.parent / "models" / "xgboost_global.pkl"
     assert gate.MODEL_PATH == expected_path
     
-    expected_cols = ['sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster']
+    expected_cols = [
+        'sharpe_rank', 'dist_high', 'market_regime', 'rel_rsi', 'ema_dist', 'vol_cluster',
+        'delivery_ratio', 'adtv_log', 'momentum_6m'
+    ]
     assert gate.FEATURE_COLS == expected_cols
 
 
 def test_extract_features_columns_and_shapes():
-    """Verify extract_features produces all 11 quantitative features."""
+    """Verify extract_features produces all 9 quantitative features."""
     dates = pd.date_range('2026-01-01', periods=60)
     df = pd.DataFrame({
         'trade_date': dates,
@@ -38,7 +41,7 @@ def test_extract_features_columns_and_shapes():
     for col in gate.FEATURE_COLS:
         assert col in feat_df.columns
     
-    # 60 days is enough to have non-NaN values for all 11 features on the latest bar
+    # 60 days is enough to have non-NaN values for all 9 features on the latest bar
     latest = feat_df[gate.FEATURE_COLS].iloc[[-1]]
     assert not latest.isna().any().any()
 
@@ -53,13 +56,28 @@ def test_fail_closed_when_model_missing():
 def test_fail_closed_insufficient_data():
     """When symbol has fewer than 50 bars, gate MUST veto (return False)."""
     init_db()
+    sparse_sym = "TEST_SPARSE_GATE_SYM"
+    db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sparse_sym,), sync=True)
+    base_date = date(2026, 1, 1)
+    for i in range(5):
+        price = 100.0 + i
+        trade_date = base_date + timedelta(days=i)
+        db_write("""
+            INSERT OR REPLACE INTO bhavcopy_daily (
+                symbol, trade_date, series, open_price, high_price, low_price,
+                close_price, prev_close, total_traded_qty, total_traded_val,
+                delivery_qty, delivery_pct, split_multiplier
+            ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 1000, 100000.0, 500, 50.0, 1.0);
+        """, (sparse_sym, trade_date, price, price + 1, price - 1, price, price - 0.5), sync=True)
+
     mock_model = MagicMock()
-    
-    with patch.object(gate, "get_champion_model", return_value=mock_model):
-        # MSCI360 has only 1 row in the test DB
-        result = gate.evaluate_second_opinion("MSCI360")
-        assert result is False, "Gate should veto when historical data is insufficient (< 50 bars)"
-        mock_model.predict_proba.assert_not_called()
+    try:
+        with patch.object(gate, "get_champion_model", return_value=mock_model):
+            result = gate.evaluate_second_opinion(sparse_sym)
+            assert result is False, "Gate should veto when historical data is insufficient (< 50 bars)"
+            mock_model.predict_proba.assert_not_called()
+    finally:
+        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sparse_sym,), sync=True)
 
 
 def test_gate_approval_and_veto_thresholds():

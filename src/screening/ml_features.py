@@ -137,7 +137,7 @@ def extract_quantitative_features(df):
     # Simple but powerful momentum signal; neutral value 0.0 if insufficient history.
     close_col = 'close_price' if 'close_price' in df.columns else 'close'
     if close_col in df.columns:
-        df['momentum_6m'] = df[close_col].pct_change(126)
+        df['momentum_6m'] = df[close_col].pct_change(126).fillna(0.0)
     else:
         df['momentum_6m'] = 0.0
 

@@ -129,7 +129,7 @@ def evaluate_second_opinion(symbol: str, conn=None, live_price: float = None, li
     df = extract_quantitative_features(df)
 
     expected_features = getattr(model, 'feature_names_in_', None)
-    if expected_features is None:
+    if not isinstance(expected_features, (list, tuple, np.ndarray, pd.Index)):
         expected_features = FEATURE_COLS
 
     try:

@@ -164,8 +164,8 @@ def extract_features_and_labels(df: pd.DataFrame, bench_features: pd.DataFrame) 
         df.index = pd.DatetimeIndex(df['trade_date'])
     df = df.join(bench_features, how='left')
 
-    df['market_regime'] = df['market_regime'].ffill().bfill().fillna(1).astype(int)
-    bench_rsi = df['benchmark_rsi'].ffill().bfill().fillna(50.0)
+    df['market_regime'] = df['market_regime'].ffill().fillna(0).astype(int)
+    bench_rsi = df['benchmark_rsi'].ffill().fillna(50.0)
     df['rel_rsi'] = df['rsi'] - bench_rsi
 
     # 7. delivery_ratio (OPTIONAL): delivery_pct normalised to 0-1 range.
@@ -285,11 +285,11 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
         except Exception as _e:
             logger.warning(f"Could not inspect existing model features: {_e}. Using full {len(FEATURE_COLS)}-feature set.")
 
-    clean_df = full_df.dropna(subset=effective_feature_cols + ['target']).copy()
-    # Fill optional features that are still NaN (e.g. momentum_6m for short histories)
+    # Fill optional features that are still NaN (e.g. momentum_6m for short histories) before dropna
     for col, neutral in [('delivery_ratio', 0.5), ('adtv_log', 0.0), ('momentum_6m', 0.0)]:
-        if col in clean_df.columns:
-            clean_df[col] = clean_df[col].fillna(neutral)
+        if col in full_df.columns:
+            full_df[col] = full_df[col].fillna(neutral)
+    clean_df = full_df.dropna(subset=effective_feature_cols + ['target']).copy()
     clean_df['target'] = clean_df['target'].astype(int)
 
     # Check minimum target variance

@@ -31,7 +31,7 @@ def record_corporate_action(
     
     act = action_type.upper()
     if act == "SPLIT":
-        if "REV" in symbol.upper() or "REVERSE" in act:
+        if "REV_SPLIT" in symbol.upper() or "REVERSE" in act:
             multiplier = max(ratio_from, ratio_to) / min(ratio_from, ratio_to) if min(ratio_from, ratio_to) > 0 else 1.0
         elif ratio_from > 0 and ratio_to > 0:
             multiplier = min(ratio_from, ratio_to) / max(ratio_from, ratio_to)

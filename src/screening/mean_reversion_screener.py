@@ -63,7 +63,7 @@ def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int
             )
             SELECT symbol, close_price
             FROM ranked
-            WHERE rn <= 150
+            WHERE rn <= 250
             ORDER BY symbol, trade_date ASC
         """, [chunk]).df()
 
@@ -82,7 +82,12 @@ def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int
             if len(c_arr) < 20:
                 continue
             rsi_val = _fast_wilders_rsi(c_arr, period=14)
-            results[s_arr[0]] = bool(rsi_val < 30.0)
+            if len(c_arr) >= 150:
+                sma_200 = float(np.mean(c_arr[-min(200, len(c_arr)):]))
+                in_uptrend = bool(c_arr[-1] > sma_200)
+            else:
+                in_uptrend = False
+            results[s_arr[0]] = bool(rsi_val < 30.0 and in_uptrend)
 
     return results
 
@@ -90,7 +95,7 @@ def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int
 def evaluate_mean_reversion(symbol: str, conn=None, live_price: float = None) -> bool:
     """
     Evaluates a stock for mean reversion (Buy the Dip in Uptrend).
-    Returns True if RSI < 30 (Oversold), False otherwise.
+    Returns True if RSI < 30 (Oversold) and price > 200-DMA, False otherwise.
     """
     if conn is None:
         with get_read_connection() as c:
@@ -128,5 +133,6 @@ def evaluate_mean_reversion(symbol: str, conn=None, live_price: float = None) ->
     rsi_series = wilders_rsi(df['close_price'], period=14)
     latest_rsi = rsi_series.iloc[-1]
     
-    # Return True if oversold
-    return bool(pd.notna(latest_rsi) and latest_rsi < 30)
+    sma_200 = df['close_price'].rolling(200, min_periods=150).mean().iloc[-1]
+    in_uptrend = bool(pd.notna(sma_200) and df['close_price'].iloc[-1] > sma_200)
+    return bool(pd.notna(latest_rsi) and latest_rsi < 30.0 and in_uptrend)
