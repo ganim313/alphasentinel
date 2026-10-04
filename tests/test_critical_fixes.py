@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.db.session import init_db, get_read_connection
+from src.db.session import init_db, get_read_connection, get_write_connection
 from src.db.queue_writer import db_write
 from src.screening.mean_reversion_screener import evaluate_mean_reversion, evaluate_mean_reversion_batch
 from src.ingestion.corporate_actions import record_corporate_action
@@ -23,55 +23,58 @@ def test_mr_screener_rejects_downtrend_falling_knife():
     """Verify mean reversion screener rejects oversold stocks trading below their 200-DMA."""
     init_db()
     sym = "TEST_MR_DOWN"
-    db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,), sync=True)
-
     base_date = date(2025, 1, 1)
     prices = np.linspace(250.0, 100.0, 200)
+    rows = [
+        (sym, base_date + timedelta(days=i), float(p), float(p) + 1.0, float(p) - 1.0, float(p), float(p) + 0.5)
+        for i, p in enumerate(prices)
+    ]
     try:
-        for i, p in enumerate(prices):
-            td = base_date + timedelta(days=i)
-            price = float(p)
-            db_write("""
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
+            conn.executemany("""
                 INSERT OR REPLACE INTO bhavcopy_daily (
                     symbol, trade_date, series, open_price, high_price, low_price,
                     close_price, prev_close, total_traded_qty, total_traded_val,
                     delivery_qty, delivery_pct, split_multiplier
                 ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
-            """, (sym, td, price, price + 1.0, price - 1.0, price, price + 0.5), sync=True)
+            """, rows)
 
         assert evaluate_mean_reversion(sym) is False
         assert evaluate_mean_reversion_batch([sym])[sym] is False
     finally:
-        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,), sync=True)
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
 
 
 def test_mr_screener_accepts_uptrend_pullback():
     """Verify mean reversion screener accepts oversold pullbacks that remain above their 200-DMA."""
     init_db()
     sym = "TEST_MR_UP"
-    db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,), sync=True)
-
     base_date = date(2025, 1, 1)
     uptrend = np.linspace(100.0, 250.0, 185)
     pullback = np.linspace(248.0, 215.0, 15)
     prices = np.concatenate([uptrend, pullback])
-
+    rows = [
+        (sym, base_date + timedelta(days=i), float(p), float(p) + 1.0, float(p) - 1.0, float(p), float(p))
+        for i, p in enumerate(prices)
+    ]
     try:
-        for i, p in enumerate(prices):
-            td = base_date + timedelta(days=i)
-            price = float(p)
-            db_write("""
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
+            conn.executemany("""
                 INSERT OR REPLACE INTO bhavcopy_daily (
                     symbol, trade_date, series, open_price, high_price, low_price,
                     close_price, prev_close, total_traded_qty, total_traded_val,
                     delivery_qty, delivery_pct, split_multiplier
                 ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
-            """, (sym, td, price, price + 1.0, price - 1.0, price, price), sync=True)
+            """, rows)
 
         assert evaluate_mean_reversion(sym) is True
         assert evaluate_mean_reversion_batch([sym])[sym] is True
     finally:
-        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,), sync=True)
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
 
 
 def test_corporate_action_rev_ticker_not_inverted():
