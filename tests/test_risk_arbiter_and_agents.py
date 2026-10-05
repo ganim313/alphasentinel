@@ -67,12 +67,23 @@ def test_manual_overlord_payload():
 
 
 def test_kill_switch_state():
-    set_system_halt_state(True, reason="UNIT_TEST_TRIGGER")
-    assert is_system_halted() is True
-    
-    set_system_halt_state(False, reason="UNIT_TEST_RESUME")
-    assert is_system_halted() is False
-    print("\n[PASS] Global Emergency Kill Switch tests passed.")
+    from src.db.session import get_read_connection, get_write_connection
+    with get_read_connection() as conn:
+        saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
+    try:
+        set_system_halt_state(True, reason="UNIT_TEST_TRIGGER")
+        assert is_system_halted() is True
+        
+        set_system_halt_state(False, reason="UNIT_TEST_RESUME")
+        assert is_system_halted() is False
+        print("\n[PASS] Global Emergency Kill Switch tests passed.")
+    finally:
+        if not saved_cb_df.empty:
+            with get_write_connection() as conn:
+                conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
+                conn.register("saved_cb_df", saved_cb_df)
+                conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
+                conn.unregister("saved_cb_df")
 
 
 if __name__ == "__main__":

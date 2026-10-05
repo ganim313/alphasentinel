@@ -22,6 +22,33 @@ from src.db.session import init_db, get_read_connection, get_write_connection
 from src.config.settings import settings
 
 
+@pytest.fixture(autouse=True)
+def preserve_phase2_db_state():
+    """Snapshot and restore macro_weather, circuit_breaker_state, and IT positions mutated by Phase 2 tests."""
+    init_db()
+    with get_read_connection() as conn:
+        saved_mw_df = conn.execute("SELECT * FROM macro_weather WHERE scan_date = CURRENT_DATE").df()
+        saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
+        saved_it_pos_df = conn.execute("SELECT * FROM positions WHERE sector = 'IT' AND id NOT LIKE 'TEST_%'").df()
+    yield
+    with get_write_connection() as conn:
+        conn.execute("DELETE FROM macro_weather WHERE scan_date = CURRENT_DATE")
+        if not saved_mw_df.empty:
+            conn.register("saved_mw_df", saved_mw_df)
+            conn.execute("INSERT OR REPLACE INTO macro_weather SELECT * FROM saved_mw_df")
+            conn.unregister("saved_mw_df")
+        if not saved_cb_df.empty:
+            conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
+            conn.register("saved_cb_df", saved_cb_df)
+            conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
+            conn.unregister("saved_cb_df")
+        conn.execute("DELETE FROM positions WHERE id IN ('TEST_POS_IT_1', 'TEST_M_ROLL_1')")
+        if not saved_it_pos_df.empty:
+            conn.register("saved_it_pos_df", saved_it_pos_df)
+            conn.execute("INSERT OR REPLACE INTO positions SELECT * FROM saved_it_pos_df")
+            conn.unregister("saved_it_pos_df")
+
+
 # =============================================================================
 # P2-1: Symbol Sync Scheduling & Bhavcopy Alerting
 # =============================================================================

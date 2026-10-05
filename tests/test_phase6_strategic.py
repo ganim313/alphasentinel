@@ -341,6 +341,28 @@ def test_backup_retention_policy_deletes_old():
     assert "Contents" not in res or len(res["Contents"]) == 0
 
 
+def test_backup_creates_local_file_and_cleans_old(tmp_path, monkeypatch):
+    """When B2 credentials are empty, run_backup creates local backup in BACKUP_DIR and enforces local retention."""
+    monkeypatch.setattr(settings, "B2_KEY_ID", "")
+    monkeypatch.setattr(settings, "B2_APPLICATION_KEY", "")
+    monkeypatch.setattr(settings, "BACKUP_RETENTION_DAYS", 7)
+
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    old_file = backup_dir / "alphasentinel_20250101_020000.duckdb"
+    old_file.write_bytes(b"old_backup_bytes")
+    old_ts = datetime.datetime.now().timestamp() - (10 * 86400)
+    os.utime(old_file, (old_ts, old_ts))
+
+    with patch("scripts.run_nightly_backup.send_telegram_alert"):
+        backup_file = backup_mod.run_backup()
+
+    assert backup_file.startswith("alphasentinel_")
+    assert (backup_dir / backup_file).exists()
+    assert not old_file.exists(), "Expired local backup should have been removed by _enforce_local_retention"
+
+
+
 # ============================================================================
 # P6-6: Shadow Mode A/B Framework Tests
 # ============================================================================

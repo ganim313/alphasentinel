@@ -583,7 +583,10 @@ def run_live_preview_pipeline():
         regime_val not in defensive_regimes
         and not any(k in str(regime_val).upper() for k in ("HIGH_RISK", "DEFENSIVE", "BEAR", "CAUTIOUS", "CRISIS"))
     )
-    regime_label = str(regime_val) if regime_val not in (None, "") else ("Regime 1" if is_bullish else "Regime 0")
+    if regime_val in (None, "", 0, 1, "0", "1"):
+        regime_label = "Regime 1" if is_bullish else "Regime 0"
+    else:
+        regime_label = str(regime_val)
     regime_desc = (
         f"🟢 Bullish ({regime_label} / Uptrend)"
         if is_bullish

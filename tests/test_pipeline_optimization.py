@@ -30,12 +30,27 @@ from src.notification.telegram_bot import set_system_halt_state
 def setup_teardown_db():
     """Ensure database is initialized and cleanup test fixtures after each run."""
     init_db()
+    with get_read_connection() as conn:
+        saved_today_eq_df = conn.execute(
+            "SELECT * FROM equity_curve WHERE trade_date = CURRENT_DATE"
+        ).df()
+        saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
     set_system_halt_state(False, reason="Test setup reset")
     yield
     with get_write_connection() as conn:
         conn.execute("DELETE FROM positions WHERE symbol LIKE 'TEST_%'")
         conn.execute("DELETE FROM screener_candidates WHERE symbol LIKE 'TEST_%'")
         conn.execute("DELETE FROM bhavcopy_daily WHERE symbol LIKE 'TEST_%'")
+        conn.execute("DELETE FROM equity_curve WHERE trade_date = CURRENT_DATE")
+        if not saved_today_eq_df.empty:
+            conn.register("saved_today_eq_df", saved_today_eq_df)
+            conn.execute("INSERT OR REPLACE INTO equity_curve SELECT * FROM saved_today_eq_df")
+            conn.unregister("saved_today_eq_df")
+        if not saved_cb_df.empty:
+            conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
+            conn.register("saved_cb_df", saved_cb_df)
+            conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
+            conn.unregister("saved_cb_df")
 
 
 # -------------------------------------------------------------------------
@@ -371,7 +386,8 @@ def test_run_live_preview_defers_ml_probability_to_max_15_calls():
          patch("scripts.run_live_preview.evaluate_ml_probability", return_value=0.75) as mock_ml_prob, \
          patch("scripts.run_live_preview.yf.download", return_value=pd.DataFrame()), \
          patch("scripts.run_live_preview.scrape_screener_fundamentals", return_value={}), \
-         patch("scripts.run_live_preview.check_shariah_compliance", return_value=(False, "TEST_EXCLUDE")):
+         patch("scripts.run_live_preview.check_shariah_compliance", return_value=(False, "TEST_EXCLUDE")), \
+         patch("src.notification.telegram_bot.send_telegram_alert"):
 
         run_live_preview_pipeline()
 

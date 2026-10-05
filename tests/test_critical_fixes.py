@@ -204,6 +204,24 @@ def test_ml_features_uses_canonical_benchmark_provider():
             assert "rsi" in bench.columns
             assert "regime" in bench.columns
 
+        # Also verify duplicate / same-day benchmark timestamps normalize and deduplicate cleanly
+        ml_feat._benchmark_cache = None
+        dup_dates = pd.DatetimeIndex(list(dates[:40]) + [dates[39] + pd.Timedelta(hours=15), dates[39]] + list(dates[40:]))
+        dup_bench_df = pd.DataFrame({
+            "Close": np.linspace(20000.0, 22000.0, len(dup_dates))
+        }, index=dup_dates)
+        with patch("src.utils.benchmark_provider.get_benchmark_ohlc", return_value=dup_bench_df):
+            sym_df = pd.DataFrame({
+                "trade_date": dates,
+                "close_price": np.linspace(100.0, 120.0, 80),
+                "high_price": np.linspace(101.0, 121.0, 80),
+                "low_price": np.linspace(99.0, 119.0, 80),
+                "total_traded_qty": [10000] * 80
+            })
+            feat_df_dup = ml_feat.extract_quantitative_features(sym_df)
+            assert len(feat_df_dup) == 80
+            assert not feat_df_dup["market_regime"].isna().any()
+
         # Also verify fallback to market_regime = 0 when benchmark is unavailable
         ml_feat._benchmark_cache = None
         with patch("src.utils.benchmark_provider.get_benchmark_ohlc", side_effect=RuntimeError("Offline")):
@@ -231,7 +249,11 @@ def test_live_preview_mean_reversion_trigger_price_and_state_input():
     sym = "TEST_MR_PREVIEW"
     base_date = datetime.date(2026, 9, 1)
 
+    with get_read_connection() as conn:
+        saved_mw_df = conn.execute("SELECT * FROM macro_weather WHERE scan_date = CURRENT_DATE").df()
+
     with get_write_connection() as conn:
+        conn.execute("DELETE FROM macro_weather WHERE scan_date = CURRENT_DATE;")
         conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
         conn.execute("DELETE FROM screener_candidates WHERE symbol = ?;", (sym,))
         conn.execute("DELETE FROM debate_transcripts WHERE symbol = ?;", (sym,))
@@ -312,4 +334,9 @@ def test_live_preview_mean_reversion_trigger_price_and_state_input():
             conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (sym,))
             conn.execute("DELETE FROM screener_candidates WHERE symbol = ?;", (sym,))
             conn.execute("DELETE FROM debate_transcripts WHERE symbol = ?;", (sym,))
+            if not saved_mw_df.empty:
+                conn.register("saved_mw_df", saved_mw_df)
+                conn.execute("INSERT OR REPLACE INTO macro_weather SELECT * FROM saved_mw_df")
+                conn.unregister("saved_mw_df")
+
 

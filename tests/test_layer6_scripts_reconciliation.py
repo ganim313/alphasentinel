@@ -11,23 +11,34 @@ from scripts.run_scheduler import setup_schedule
 
 
 def test_drawdown_check_runs_and_updates_state():
+    from src.db.session import get_read_connection
     init_db()
-    # Ensure id=1 exists in circuit_breaker_state
-    with get_write_connection() as conn:
-        conn.execute("""
-            INSERT OR IGNORE INTO circuit_breaker_state (id, is_halted, halt_reason, monthly_drawdown_pct, high_water_mark)
-            VALUES (1, FALSE, 'INITIALIZED', 0.0, 1000000.0)
-        """)
-    
-    # Should run cleanly and update updated_at without BinderException
-    check_drawdown()
+    with get_read_connection() as conn:
+        saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
+    try:
+        # Ensure id=1 exists in circuit_breaker_state
+        with get_write_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO circuit_breaker_state (id, is_halted, halt_reason, monthly_drawdown_pct, high_water_mark, monthly_peak_equity)
+                VALUES (1, FALSE, 'INITIALIZED', 0.0, 1000000.0, 1000000.0)
+            """)
+        
+        # Should run cleanly and update updated_at without BinderException
+        check_drawdown()
 
-    with get_write_connection() as conn:
-        row = conn.execute("SELECT monthly_drawdown_pct, high_water_mark, updated_at FROM circuit_breaker_state WHERE id = 1").fetchone()
-        assert row is not None
-        assert row[0] >= 0.0
-        assert row[1] >= 1000000.0
-        assert row[2] is not None
+        with get_write_connection() as conn:
+            row = conn.execute("SELECT monthly_drawdown_pct, high_water_mark, updated_at FROM circuit_breaker_state WHERE id = 1").fetchone()
+            assert row is not None
+            assert row[0] >= 0.0
+            assert row[1] >= 1000000.0
+            assert row[2] is not None
+    finally:
+        if not saved_cb_df.empty:
+            with get_write_connection() as conn:
+                conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
+                conn.register("saved_cb_df", saved_cb_df)
+                conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
+                conn.unregister("saved_cb_df")
 
 
 def test_scheduler_ist_jobs_registered():

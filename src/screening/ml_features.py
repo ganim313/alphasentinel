@@ -91,10 +91,10 @@ def extract_quantitative_features(df):
         if hasattr(bench_copy.index, 'tz') and bench_copy.index.tz is not None:
             bench_dates = bench_copy.index.tz_localize(None).normalize()
         else:
-            bench_dates = bench_copy.index.normalize()
+            bench_dates = pd.DatetimeIndex(bench_copy.index).normalize()
         
-        bench_copy = bench_copy[~bench_copy.index.duplicated(keep='last')]
         bench_copy.index = bench_dates
+        bench_copy = bench_copy[~bench_copy.index.duplicated(keep='last')]
         
         # Merge regime and rsi
         bench_aligned = bench_copy.reindex(df_dates).ffill()

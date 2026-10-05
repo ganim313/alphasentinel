@@ -43,12 +43,21 @@ def test_order_manager_nan_guards():
 
 
 def test_order_manager_halt_guard():
+    from src.db.session import get_read_connection
+    with get_read_connection() as conn:
+        saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
     set_system_halt_state(True, reason="UNIT_TEST_LAYER5_HALT")
     try:
         res = execute_trade("TEST_HALT", 100.0, 5.0, 100)
         assert res == ""
     finally:
         set_system_halt_state(False, reason="UNIT_TEST_LAYER5_RESUME")
+        if not saved_cb_df.empty:
+            with get_write_connection() as conn:
+                conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
+                conn.register("saved_cb_df", saved_cb_df)
+                conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
+                conn.unregister("saved_cb_df")
 
 
 def test_order_manager_idempotency():
