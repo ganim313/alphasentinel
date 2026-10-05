@@ -289,13 +289,15 @@ def test_benchmark_provider_caching_and_regime():
             "Close": [200.0 - i for i in range(100)],
             "Volume": [1000] * 100
         }, index=dates)
+        from zoneinfo import ZoneInfo
         import src.utils.benchmark_provider as bp
-        bp._cache = {"ohlc": downward_df, "fetched_at": bp.datetime.datetime.now()}
+        bp._cache = {"ohlc": downward_df, "fetched_at": bp.datetime.datetime.now(ZoneInfo("Asia/Kolkata"))}
         assert get_market_regime() == 0
 
 
 def test_benchmark_provider_as_of_date_formats():
     """Verify get_market_regime supports str, date, timestamp, and tz-aware inputs."""
+    from zoneinfo import ZoneInfo
     from src.utils.benchmark_provider import get_market_regime
     import src.utils.benchmark_provider as bp
 
@@ -308,7 +310,7 @@ def test_benchmark_provider_as_of_date_formats():
         "Volume": [1000] * 100
     }, index=dates)
 
-    bp._cache = {"ohlc": mock_df, "fetched_at": bp.datetime.datetime.now()}
+    bp._cache = {"ohlc": mock_df, "fetched_at": bp.datetime.datetime.now(ZoneInfo("Asia/Kolkata"))}
 
     # String date
     regime_str = get_market_regime(as_of_date="2026-03-01")

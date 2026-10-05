@@ -67,18 +67,19 @@ def get_active_universe(conn, as_of_date: Optional[datetime.date] = None):
     """
     from zoneinfo import ZoneInfo
     ref_date = as_of_date or datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    cutoff_date = ref_date - datetime.timedelta(days=5)
     return conn.execute("""
         SELECT b.symbol, MAX(b.series) as series, MAX(b.circuit_band_pct) as cb
         FROM bhavcopy_daily b
         WHERE b.symbol IS NOT NULL
-          AND b.trade_date >= (CURRENT_DATE - INTERVAL '5 days')
+          AND b.trade_date >= ?
           AND b.total_traded_qty > 0
           AND b.symbol NOT IN (
               SELECT symbol FROM delisted_stocks
-              WHERE symbol IS NOT NULL AND delisted_date IS NOT NULL AND delisted_date <= CURRENT_DATE
+              WHERE symbol IS NOT NULL AND delisted_date IS NOT NULL AND delisted_date <= ?
           )
         GROUP BY b.symbol
-    """).fetchall()
+    """, (cutoff_date, ref_date)).fetchall()
 
 def run_live_preview_pipeline():
     logger.info("=" * 70)

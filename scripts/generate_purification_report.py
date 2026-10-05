@@ -52,8 +52,11 @@ def resolve_report_year_month(
     reports on the previous completed calendar month.
     """
     from zoneinfo import ZoneInfo
+    ist = ZoneInfo("Asia/Kolkata")
     if now is None:
-        now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+        now = datetime.datetime.now(ist)
+    elif getattr(now, "tzinfo", None) is not None:
+        now = now.astimezone(ist)
     args = argv if argv is not None else sys.argv
     if len(args) == 3:
         return int(args[1]), int(args[2])

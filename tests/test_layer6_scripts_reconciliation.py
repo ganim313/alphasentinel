@@ -184,6 +184,12 @@ def test_purification_report_first_of_month_previous_month_resolution():
         now=oct_1, argv=["generate_purification_report.py", "2026", "5"]
     ) == (2026, 5)
 
+    # 5. UTC-aware timestamp at 20:00 UTC on Sept 30 (== 01:30 AM IST on Oct 1) resolves to Sept 2026
+    utc_sept_30_late = datetime.datetime(2026, 9, 30, 20, 0, 0, tzinfo=datetime.timezone.utc)
+    assert resolve_report_year_month(
+        now=utc_sept_30_late, argv=["generate_purification_report.py"]
+    ) == (2026, 9)
+
 
 def test_nightly_backup_filename_uses_ist_timezone(tmp_path, monkeypatch):
     """
@@ -308,3 +314,35 @@ def test_portfolio_state_ist_month_boundary_with_utc_timestamp():
     assert state["as_of"].endswith("+05:30")
 
 
+def test_get_active_universe_binds_ref_date_instead_of_current_date():
+    """
+    Verify get_active_universe(conn, as_of_date=...) uses ref_date in the SQL query
+    rather than ignoring ref_date and hardcoding DuckDB CURRENT_DATE.
+    """
+    import duckdb
+    from scripts.run_live_preview import get_active_universe
+
+    mem_conn = duckdb.connect(":memory:")
+    mem_conn.execute("""
+        CREATE TABLE bhavcopy_daily (
+            symbol VARCHAR,
+            trade_date DATE,
+            series VARCHAR,
+            circuit_band_pct DOUBLE,
+            total_traded_qty BIGINT
+        );
+        CREATE TABLE delisted_stocks (
+            symbol VARCHAR,
+            delisted_date DATE
+        );
+        INSERT INTO bhavcopy_daily VALUES
+            ('HIST_ACTIVE', DATE '2025-06-13', 'EQ', 20.0, 100000),
+            ('HIST_STALE', DATE '2025-06-01', 'EQ', 20.0, 100000),
+            ('HIST_DELISTED', DATE '2025-06-13', 'EQ', 20.0, 100000);
+        INSERT INTO delisted_stocks VALUES
+            ('HIST_DELISTED', DATE '2025-06-14');
+    """)
+
+    rows = get_active_universe(mem_conn, as_of_date=datetime.date(2025, 6, 15))
+    symbols = [r[0] for r in rows]
+    assert symbols == ["HIST_ACTIVE"]

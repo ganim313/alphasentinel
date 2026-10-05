@@ -57,7 +57,8 @@ def test_eod_reconciliation_pnl_with_quantity():
         ]
 
         import datetime
-        today = datetime.datetime.now().date()
+        from zoneinfo import ZoneInfo
+        today = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
         def execute_side_effect(query, params=None):
             m = mock.MagicMock()

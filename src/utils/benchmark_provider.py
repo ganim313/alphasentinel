@@ -37,8 +37,8 @@ def get_benchmark_ohlc(lookback_days: int = 400) -> pd.DataFrame:
     ist = ZoneInfo("Asia/Kolkata")
     now = datetime.datetime.now(ist)
     fetched_at = _cache["fetched_at"]
-    if fetched_at is not None and getattr(fetched_at, "tzinfo", None) is None:
-        fetched_at = fetched_at.replace(tzinfo=ist)
+    if fetched_at is not None:
+        fetched_at = fetched_at.astimezone(ist)
     if (
         _cache["ohlc"] is not None
         and fetched_at is not None

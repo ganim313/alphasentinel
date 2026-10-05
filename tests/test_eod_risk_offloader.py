@@ -31,7 +31,8 @@ def test_eod_risk_offloader_logic(
     mock_get_conn.return_value.__enter__.return_value = mock_conn
     
     import datetime
-    today = datetime.datetime.now().date()
+    from zoneinfo import ZoneInfo
+    today = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
     
     def execute_side_effect(query, params=None):
         mock_result = mock.MagicMock()

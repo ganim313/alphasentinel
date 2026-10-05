@@ -7,9 +7,27 @@ Ensures that running pytest on local or production VMs:
    when tests interact with the primary DuckDB file.
 """
 
+from pathlib import Path
 import pytest
 from src.config.settings import settings
 from src.db.session import get_db_path, get_read_connection, get_write_connection, init_db
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_METRICS_PATH = _PROJECT_ROOT / "dashboard" / "portfolio_metrics.json"
+_SNAPSHOT_TABLES = (
+    "circuit_breaker_state",
+    "strategy_version",
+    "equity_curve",
+    "macro_weather",
+    "agent_memory",
+    "positions",
+    "screener_candidates",
+    "purification_log",
+    "corporate_actions",
+    "debate_transcripts",
+    "paper_capital_config",
+    "delisted_stocks",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -18,66 +36,69 @@ def isolate_telegram_and_db_state(monkeypatch):
     Global autouse fixture:
     - Clears TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID so send_telegram_* functions operate in
       simulated mode unless a test explicitly sets dummy credentials and mocks requests.
-    - Standardizes get_paper_capital to 1_000_000.0 so custom VM capital configs (e.g. ₹1L)
-      do not cause false 90% drawdown halts or break ₹10L baseline assertions.
-    - Snapshots and restores circuit_breaker_state, strategy_version, and today's equity_curve
-      on the primary database.
+    - Standardizes get_paper_capital to 1_000_000.0 (including direct imports in run_trigger_watcher)
+      so custom VM capital configs (e.g. ₹1L) do not cause false 90% drawdown halts or break ₹10L
+      baseline assertions.
+    - Snapshots and restores all operational DuckDB tables (including full equity_curve with
+      recorded_at timestamps) and dashboard/portfolio_metrics.json on the primary database.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "")
     monkeypatch.setattr(settings, "TELEGRAM_CHAT_ID", "")
     monkeypatch.setattr("src.portfolio.paper_capital.get_paper_capital", lambda conn=None: 1_000_000.0)
+    monkeypatch.setattr(
+        "scripts.run_trigger_watcher.get_paper_capital",
+        lambda conn=None: 1_000_000.0,
+        raising=False,
+    )
 
     primary_db_path = get_db_path()
-    saved_cb_df = None
-    saved_sv_df = None
-    saved_eq_df = None
-    saved_mw_df = None
+    saved_tables = {}
+    metrics_existed = _METRICS_PATH.exists()
+    saved_metrics_bytes = _METRICS_PATH.read_bytes() if metrics_existed else None
 
     try:
         init_db()
         with get_read_connection() as conn:
-            saved_cb_df = conn.execute("SELECT * FROM circuit_breaker_state WHERE id = 1").df()
-            saved_sv_df = conn.execute("SELECT * FROM strategy_version").df()
-            saved_eq_df = conn.execute(
-                "SELECT * FROM equity_curve WHERE trade_date >= CURRENT_DATE - INTERVAL 1 DAY"
-            ).df()
-            saved_mw_df = conn.execute("SELECT * FROM macro_weather").df()
+            for tbl in _SNAPSHOT_TABLES:
+                try:
+                    saved_tables[tbl] = conn.execute(f"SELECT * FROM {tbl}").df()
+                except Exception:
+                    pass
     except Exception:
         pass
 
     yield
 
+    # Restore dashboard/portfolio_metrics.json
+    try:
+        if metrics_existed and saved_metrics_bytes is not None:
+            _METRICS_PATH.write_bytes(saved_metrics_bytes)
+        elif not metrics_existed and _METRICS_PATH.exists():
+            _METRICS_PATH.unlink()
+    except Exception:
+        pass
+
     # Only restore if get_db_path() still points to the primary DB
     try:
         if get_db_path() == primary_db_path:
             with get_write_connection() as conn:
-                if saved_cb_df is not None and not saved_cb_df.empty:
-                    conn.execute("DELETE FROM circuit_breaker_state WHERE id = 1")
-                    conn.register("saved_cb_df", saved_cb_df)
-                    conn.execute("INSERT INTO circuit_breaker_state SELECT * FROM saved_cb_df")
-                    conn.unregister("saved_cb_df")
+                for tbl, df in saved_tables.items():
+                    try:
+                        conn.execute(f"DELETE FROM {tbl}")
+                        if not df.empty:
+                            view_name = f"_saved_{tbl}"
+                            conn.register(view_name, df)
+                            conn.execute(f"INSERT INTO {tbl} SELECT * FROM {view_name}")
+                            conn.unregister(view_name)
+                    except Exception:
+                        pass
 
-                if saved_sv_df is not None:
-                    conn.execute("DELETE FROM strategy_version")
-                    if not saved_sv_df.empty:
-                        conn.register("saved_sv_df", saved_sv_df)
-                        conn.execute("INSERT INTO strategy_version SELECT * FROM saved_sv_df")
-                        conn.unregister("saved_sv_df")
-
-                if saved_eq_df is not None:
-                    conn.execute(
-                        "DELETE FROM equity_curve WHERE trade_date >= CURRENT_DATE - INTERVAL 1 DAY"
-                    )
-                    if not saved_eq_df.empty:
-                        conn.register("saved_eq_df", saved_eq_df)
-                        conn.execute("INSERT OR REPLACE INTO equity_curve SELECT * FROM saved_eq_df")
-                        conn.unregister("saved_eq_df")
-
-                if saved_mw_df is not None:
-                    conn.execute("DELETE FROM macro_weather")
-                    if not saved_mw_df.empty:
-                        conn.register("saved_mw_df", saved_mw_df)
-                        conn.execute("INSERT OR REPLACE INTO macro_weather SELECT * FROM saved_mw_df")
-                        conn.unregister("saved_mw_df")
+                conn.execute(
+                    "DELETE FROM bhavcopy_daily WHERE symbol LIKE 'TEST_%' "
+                    "OR symbol LIKE 'UV_TEST_%' OR symbol LIKE 'UV_NULL_%'"
+                )
+                conn.execute("DELETE FROM fundamentals_cache WHERE symbol LIKE 'TEST_%'")
+                conn.execute("DELETE FROM promoter_pledge_history WHERE symbol LIKE 'TEST_%'")
     except Exception:
         pass
+
