@@ -83,6 +83,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         "cwip": 0.0,
         "inventories": 0.0,
         "intangible_assets": 0.0,
+        "trade_receivables": 0.0,
+        "accounts_receivable": 0.0,
         "interest_income_ratio": 0.0,
         "debt_to_assets": 0.0,
         "illiquid_ratio": 0.0,
@@ -134,11 +136,44 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         debt_to_equity = ratios.get("debt to equity", fallback_data["debt_to_equity"])
         pledged = ratios.get("pledged percentage", fallback_data["promoter_pledged_pct"])
 
-        # Extract Industry/Sector for Shariah Compliance
+        # Extract Industry/Sector for Shariah Compliance & Sector Concentration Caps
         sector_name = ""
-        sector_el = soup.select_one('a[href^="/explore/?sector="]')
-        if sector_el:
-            sector_name = sector_el.get_text(strip=True)
+        sector_candidates = []
+        for sel in (
+            'a[href^="/explore/?sector="]',
+            'a[href*="/explore/"]',
+            '#peers a[href^="/market/"]',
+            'a[href^="/market/"]',
+            '#peers a',
+        ):
+            for el in soup.select(sel):
+                href = (el.get("href") or "").strip()
+                if any(href.startswith(p) for p in ("/company/", "/screen/", "/user/", "#", "javascript:")):
+                    continue
+                txt = el.get_text(strip=True)
+                if txt and txt.lower() not in ("customize", "edit", "peers", "more") and txt not in sector_candidates:
+                    sector_candidates.append(txt)
+            if sector_candidates:
+                break
+
+        if sector_candidates:
+            # Prefer explicit 'Sector' title link if present, else first breadcrumb
+            sector_title_el = soup.select_one('#peers a[title="Sector"], a[title="Sector"]')
+            if sector_title_el and sector_title_el.get_text(strip=True):
+                sector_name = sector_title_el.get_text(strip=True)
+            else:
+                sector_name = sector_candidates[0]
+
+            # If a sub-industry breadcrumb contains a Shariah-prohibited keyword, preserve it in sector_name
+            try:
+                from src.screening.shariah_filter import PROHIBITED_SECTORS
+                for cand_txt in sector_candidates:
+                    cand_low = cand_txt.lower()
+                    if any(p in cand_low for p in PROHIBITED_SECTORS) and cand_txt not in sector_name:
+                        sector_name = f"{sector_name} - {cand_txt}" if sector_name else cand_txt
+                        break
+            except Exception:
+                pass
 
         # Helper to extract quantitative P&L / Balance Sheet data
         def get_row_last_val(section_id, row_name):
@@ -171,8 +206,15 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         fixed_assets = get_row_last_val('balance-sheet', 'fixed assets')
         cwip = get_row_last_val('balance-sheet', 'cwip')
         inventories = get_row_last_val('balance-sheet', 'inventories')
+        if inventories <= 0.0:
+            inventories = get_row_last_val('balance-sheet', 'inventory')
         intangible_assets = get_row_last_val('balance-sheet', 'intangible assets')
         other_liabilities = get_row_last_val('balance-sheet', 'other liabilities')
+        trade_receivables = get_row_last_val('balance-sheet', 'trade receivables')
+        if trade_receivables <= 0.0:
+            trade_receivables = get_row_last_val('balance-sheet', 'accounts receivable')
+        if trade_receivables <= 0.0:
+            trade_receivables = get_row_last_val('balance-sheet', 'receivables')
 
         # Calculate quantitative compliance:
         # NOTE: PRD specifies max(other_income, interest_income) / sales.
@@ -191,7 +233,7 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         total_liabilities = borrowings + other_liabilities
         net_liquid_assets = (total_assets - total_illiquid) - total_liabilities
 
-        # Fetch News Headlines via yfinance
+        # Fetch News Headlines via yfinance (and fallback sector metadata if missing)
         news_headlines = []
         recent_news_count = 0
         try:
@@ -202,34 +244,54 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                 news_headlines = [n.get('content', {}).get('title', '') or n.get('title', '') for n in news]
                 news_headlines = [title for title in news_headlines if title]
                 recent_news_count = len(news_headlines)
+            if not sector_name:
+                info = getattr(ticker, "info", None)
+                if isinstance(info, dict):
+                    yf_sec = info.get("sector") or info.get("industry") or ""
+                    if isinstance(yf_sec, str) and yf_sec.strip():
+                        sector_name = yf_sec.strip()
         except Exception as e:
             logger.warning(f"Failed to fetch yfinance news for {symbol}: {e}")
 
-        # Calculate pledge trend using history
+        # Calculate pledge trend using history from prior dates (before inserting today's row)
         pledge_trend_3m = 0.0
         try:
             from src.db.session import get_read_connection
             with get_read_connection() as conn:
                 row = conn.execute(
-                    "SELECT pledge_pct FROM promoter_pledge_history WHERE symbol = ? ORDER BY quarter_end_date DESC LIMIT 1", 
+                    """
+                    SELECT pledge_pct FROM promoter_pledge_history
+                    WHERE symbol = ? AND quarter_end_date <= CURRENT_DATE - INTERVAL '30 days'
+                    ORDER BY quarter_end_date DESC LIMIT 1
+                    """,
                     (symbol,)
                 ).fetchone()
-                if row:
+                if not row:
+                    row = conn.execute(
+                        """
+                        SELECT pledge_pct FROM promoter_pledge_history
+                        WHERE symbol = ? AND quarter_end_date < CURRENT_DATE
+                        ORDER BY quarter_end_date ASC LIMIT 1
+                        """,
+                        (symbol,)
+                    ).fetchone()
+                if row and row[0] is not None:
                     pledge_3m_ago = float(row[0])
                     pledge_trend_3m = pledged - pledge_3m_ago
         except Exception as e:
             logger.warning(f"Failed to fetch pledge history for {symbol}: {e}")
 
-        # Persist scraped pledge percentage into promoter_pledge_history
-        try:
-            from src.db.queue_writer import db_write
-            db_write("""
-                INSERT OR REPLACE INTO promoter_pledge_history (
-                    symbol, quarter_end_date, pledge_pct, created_at
-                ) VALUES (?, CURRENT_DATE, ?, CURRENT_TIMESTAMP);
-            """, (symbol, float(pledged)))
-        except Exception as pledge_err:
-            logger.debug(f"Failed to record promoter_pledge_history for {symbol}: {pledge_err}")
+        # Persist scraped pledge percentage into promoter_pledge_history ONLY if valid company ratios exist (skip ETFs)
+        if len(ratios) > 0:
+            try:
+                from src.db.queue_writer import db_write
+                db_write("""
+                    INSERT OR REPLACE INTO promoter_pledge_history (
+                        symbol, quarter_end_date, pledge_pct, created_at
+                    ) VALUES (?, CURRENT_DATE, ?, CURRENT_TIMESTAMP);
+                """, (symbol, float(pledged)))
+            except Exception as pledge_err:
+                logger.debug(f"Failed to record promoter_pledge_history for {symbol}: {pledge_err}")
 
         result = {
             "symbol": symbol,
@@ -252,6 +314,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             "cwip": cwip,
             "inventories": inventories,
             "intangible_assets": intangible_assets,
+            "trade_receivables": trade_receivables,
+            "accounts_receivable": trade_receivables,
             "interest_income_ratio": interest_income_ratio,
             "debt_to_assets": debt_to_assets,
             "illiquid_ratio": illiquid_ratio,

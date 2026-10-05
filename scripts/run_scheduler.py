@@ -91,6 +91,14 @@ def run_script(script_name: str, timeout_seconds: int = 600) -> bool:
         elapsed = time.time() - start_time
         if proc.returncode == 0:
             logger.info(f"==> [SUCCESS] Task {script_name} completed in {elapsed:.2f}s.")
+            out_lines = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
+            err_lines = [ln.strip() for ln in (proc.stderr or "").splitlines() if ln.strip()]
+            if out_lines:
+                tail_out = "\n  ".join(out_lines[-5:])
+                logger.info(f"  [{script_name} stdout tail]:\n  {tail_out}")
+            if err_lines:
+                tail_err = "\n  ".join(err_lines[-5:])
+                logger.info(f"  [{script_name} stderr tail]:\n  {tail_err}")
             return True
         else:
             logger.error(

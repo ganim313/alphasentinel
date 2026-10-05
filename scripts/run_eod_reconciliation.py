@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 from src.notification.telegram_bot import is_system_halted
 from src.db.session import get_read_connection
 from src.db.queue_writer import db_write
+from src.utils.holidays import is_nse_holiday
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("run_eod_reconciliation")
@@ -86,7 +87,7 @@ def run_eod_reconciliation_pipeline():
         dates_to_fetch = []
         curr_date = last_date + timedelta(days=1)
         while curr_date <= today:
-            if curr_date.weekday() < 5: # Monday to Friday
+            if curr_date.weekday() < 5 and not is_nse_holiday(curr_date): # Monday to Friday (excluding NSE holidays)
                 dates_to_fetch.append(curr_date)
             curr_date += timedelta(days=1)
             
@@ -442,12 +443,6 @@ def run_eod_reconciliation_pipeline():
         logger.info(f"📊 Daily equity_curve recorded: Total ₹{total_eq:,.2f} | Unrealized ₹{unrealized:,.2f}")
     except Exception as eq_err:
         logger.warning(f"Failed to record daily equity_curve row: {eq_err}")
-
-    # -------------------------------------------------------------
-    # DRAWDOWN CIRCUIT BREAKER CHECK
-    # -------------------------------------------------------------
-    from scripts.run_drawdown_check import check_drawdown
-    check_drawdown()
 
 
 if __name__ == "__main__":

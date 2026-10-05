@@ -33,9 +33,22 @@ def _fast_wilders_rsi(close_arr: np.ndarray, period: int = 14) -> float:
     return 100.0 - (100.0 / (1.0 + rs))
 
 
-def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int = 500) -> Dict[str, bool]:
+_LAST_MR_SMA200_MAP: Dict[str, float] = {}
+
+
+def get_last_mr_sma200_map() -> Dict[str, float]:
+    """Returns the most recently computed 200-DMA values from evaluate_mean_reversion_batch."""
+    return dict(_LAST_MR_SMA200_MAP)
+
+
+def evaluate_mean_reversion_batch(
+    symbols: List[str],
+    conn=None,
+    batch_size: int = 500,
+    return_details: bool = False,
+) -> Dict[str, bool]:
     """
-    Batch evaluation of mean reversion (RSI < 30) across symbols in vectorized queries.
+    Batch evaluation of mean reversion (RSI < 30 and close > 200-DMA) across symbols in vectorized queries.
     Reduces 2,000+ sequential SQL round-trips from ~280s to <0.1s.
     """
     if not symbols:
@@ -47,9 +60,14 @@ def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int
 
     if conn is None:
         with get_read_connection() as c:
-            return evaluate_mean_reversion_batch(sym_list, conn=c, batch_size=batch_size)
+            return evaluate_mean_reversion_batch(
+                sym_list, conn=c, batch_size=batch_size, return_details=return_details
+            )
 
-    results = {sym: False for sym in sym_list}
+    results: Dict[str, Any] = {
+        sym: ({"passed": False, "sma_200": None, "rsi": 50.0} if return_details else False)
+        for sym in sym_list
+    }
     step = max(1, batch_size)
 
     for i in range(0, len(sym_list), step):
@@ -79,15 +97,22 @@ def evaluate_mean_reversion_batch(symbols: List[str], conn=None, batch_size: int
         sym_keys = np.split(sym_col, change_idx)
 
         for s_arr, c_arr in zip(sym_keys, splits):
+            sym_name = str(s_arr[0])
             if len(c_arr) < 20:
                 continue
             rsi_val = _fast_wilders_rsi(c_arr, period=14)
+            sma_200_val: Optional[float] = None
             if len(c_arr) >= 150:
-                sma_200 = float(np.mean(c_arr[-min(200, len(c_arr)):]))
-                in_uptrend = bool(c_arr[-1] > sma_200)
+                sma_200_val = float(np.mean(c_arr[-min(200, len(c_arr)):]))
+                _LAST_MR_SMA200_MAP[sym_name] = sma_200_val
+                in_uptrend = bool(c_arr[-1] > sma_200_val)
             else:
                 in_uptrend = False
-            results[s_arr[0]] = bool(rsi_val < 30.0 and in_uptrend)
+            passed = bool(rsi_val < 30.0 and in_uptrend)
+            if return_details:
+                results[sym_name] = {"passed": passed, "sma_200": sma_200_val, "rsi": float(rsi_val)}
+            else:
+                results[sym_name] = passed
 
     return results
 

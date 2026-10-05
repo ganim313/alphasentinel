@@ -124,7 +124,7 @@ def evaluate_minervini_vcp_batch(
         sma_21 = close_df.rolling(21, min_periods=10).mean()
         sma_50 = close_df.rolling(50, min_periods=50).mean()
         sma_150 = close_df.rolling(150, min_periods=150).mean()
-        sma_200 = close_df.rolling(200, min_periods=200).mean()
+        sma_200 = close_df.rolling(200, min_periods=150).mean()
         
         trend_period = MINERVINI_CONFIG.get("trend_dma_period", 21)
         
@@ -144,7 +144,7 @@ def evaluate_minervini_vcp_batch(
                 continue
                 
             sym_close = close_df[sym].dropna()
-            if len(sym_close) < 50:
+            if len(sym_close) < 150:
                 continue
                 
             current_price = live_prices.get(sym)
@@ -158,17 +158,21 @@ def evaluate_minervini_vcp_batch(
                 continue
 
             # Core Minervini Moving Average Hierarchy (Strict Stage 2)
-            if len(sma_150[sym].dropna()) == 0 or len(sma_200[sym].dropna()) < 20:
-                continue # Must have sufficient 200-SMA history
+            sma_200_valid = sma_200[sym].dropna()
+            if len(sma_150[sym].dropna()) == 0 or len(sma_200_valid) == 0:
+                continue # Must have sufficient 200-SMA history (min_periods=150)
                 
-            if pd.isna(sma_200[sym].iloc[-20]) or pd.isna(sma_200[sym].iloc[-1]):
+            lookback_idx = -min(20, len(sma_200_valid))
+            sma_200_prev = sma_200_valid.iloc[lookback_idx]
+            sma_200_curr = sma_200_valid.iloc[-1]
+            if pd.isna(sma_200_prev) or pd.isna(sma_200_curr):
                 continue
 
             c0 = current_price > sma_50[sym].iloc[-1]
-            c1 = current_price > sma_150[sym].iloc[-1] and current_price > sma_200[sym].iloc[-1]
-            c2 = sma_150[sym].iloc[-1] > sma_200[sym].iloc[-1]
-            c3 = sma_200[sym].iloc[-1] >= sma_200[sym].iloc[-20] # 200-day moving average must be trending upward for 1 month
-            c4 = sma_50[sym].iloc[-1] > sma_150[sym].iloc[-1] and sma_50[sym].iloc[-1] > sma_200[sym].iloc[-1]
+            c1 = current_price > sma_150[sym].iloc[-1] and current_price > sma_200_curr
+            c2 = (sma_150[sym].iloc[-1] >= sma_200_curr) if len(sym_close) == 150 else (sma_150[sym].iloc[-1] > sma_200_curr)
+            c3 = sma_200_curr >= sma_200_prev # 200-day moving average must be trending upward for 1 month
+            c4 = sma_50[sym].iloc[-1] > sma_150[sym].iloc[-1] and sma_50[sym].iloc[-1] > sma_200_curr
             
             # 52-Week High & Low Criteria
             if pd.isna(low_252d[sym]) or pd.isna(high_252d[sym]) or low_252d[sym] <= 0 or high_252d[sym] <= 0:
@@ -239,6 +243,8 @@ def evaluate_minervini_vcp_batch(
                 "sma_10": round(sma_10[sym].iloc[-1], 2),
                 "sma_21": round(sma_21[sym].iloc[-1], 2),
                 "sma_50": round(sma_50[sym].iloc[-1], 2),
+                "sma_150": round(float(sma_150[sym].iloc[-1]), 2),
+                "sma_200": round(float(sma_200_curr), 2),
                 "pct_above_52w_low": round((current_price - low_252d[sym]) / low_252d[sym] * 100, 1) if low_252d[sym] > 0 else 0.0,
                 "pct_from_52w_high": round((high_252d[sym] - current_price) / high_252d[sym] * 100, 1) if high_252d[sym] > 0 else 0.0,
                 "volume_dryup": bool(volume_dryup),
@@ -251,3 +257,8 @@ def evaluate_minervini_vcp_batch(
             
     results.sort(key=lambda x: x.get("rs_score", 0), reverse=True)
     return results
+
+
+# Aliases for Stage 2 VCP evaluators
+evaluate_vcp_stage2 = evaluate_minervini_vcp_pattern
+evaluate_vcp_stage2_batch = evaluate_minervini_vcp_batch

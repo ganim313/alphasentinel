@@ -210,12 +210,12 @@ def run_live_preview_pipeline():
                 t_val = sym_adtv_info["adtv"]
                 if t_val >= 500_000_000.0:
                     tier = "LARGE"
-                elif t_val >= 150_000_000.0:
-                    tier = "MID"
                 elif t_val >= 25_000_000.0:
+                    tier = "MID"
+                elif t_val >= 5_000_000.0:
                     tier = "SMALL"
                 else:
-                    tier = "SMALL"
+                    tier = "MICRO"
 
             market_cap_tier_map[symbol] = tier
             adtv_floor = 2500000.0  # ₹25 Lakhs floor
@@ -238,11 +238,19 @@ def run_live_preview_pipeline():
         )
         vcp_results_map = {res["symbol"]: res for res in vcp_results_list}
         mr_results_map = evaluate_mean_reversion_batch(liquid_symbols, conn)
+        from src.screening.mean_reversion_screener import get_last_mr_sma200_map
+        mr_sma200_map = get_last_mr_sma200_map()
 
         raw_candidates = []
         for symbol in liquid_symbols:
             vcp_candidate = vcp_results_map.get(symbol)
-            mr_signal = mr_results_map.get(symbol, False)
+            mr_raw = mr_results_map.get(symbol, False)
+            if isinstance(mr_raw, dict):
+                mr_signal = bool(mr_raw.get("passed", mr_raw.get("is_mr", True)))
+                mr_sma200 = mr_raw.get("sma_200")
+            else:
+                mr_signal = bool(mr_raw)
+                mr_sma200 = mr_sma200_map.get(symbol)
 
             has_vcp = vcp_candidate is not None
             if not (has_vcp or mr_signal):
@@ -252,6 +260,7 @@ def run_live_preview_pipeline():
             trig_price = vcp_candidate["trigger_price"] if vcp_candidate else cur_price
             pat_type = vcp_candidate["pattern_type"] if vcp_candidate else "MEAN_REVERSION"
             cand_tier = market_cap_tier_map.get(symbol, "SMALL")
+            cand_sma200 = vcp_candidate.get("sma_200") if vcp_candidate else mr_sma200
 
             raw_candidates.append({
                 "symbol": symbol,
@@ -259,6 +268,7 @@ def run_live_preview_pipeline():
                     "pattern_type": pat_type,
                     "current_price": cur_price,
                     "trigger_price": trig_price,
+                    "sma_200": float(cand_sma200) if cand_sma200 is not None else None,
                     "regime_bypass_size_reduction": vcp_candidate.get("regime_bypass_size_reduction", 1.0) if vcp_candidate else 1.0
                 },
                 "circuit_band": circuit_band_map.get(symbol, 20.0),
@@ -283,11 +293,24 @@ def run_live_preview_pipeline():
         candidate_pool = raw_candidates[:15]
         for item in candidate_pool:
             item["ml_prob"] = evaluate_ml_probability(item["symbol"], conn)
+            if item["candidate"].get("sma_200") is None:
+                try:
+                    sma_row = conn.execute("""
+                        SELECT AVG(close_price) FROM (
+                            SELECT close_price FROM bhavcopy_daily
+                            WHERE symbol = ? ORDER BY trade_date DESC LIMIT 200
+                        )
+                    """, (item["symbol"],)).fetchone()
+                    if sma_row and sma_row[0] is not None:
+                        item["candidate"]["sma_200"] = float(sma_row[0])
+                except Exception:
+                    pass
 
     # 7. Pass 3: Targeted Live 3:15 PM Ticks via Yahoo Finance ONLY for candidates (~1-2s)
     if candidate_pool:
         logger.info(f"Fetching live 3:15 PM ticks for {len(candidate_pool)} technical candidates...")
         cand_tickers_ns = [f"{c['symbol']}.NS" for c in candidate_pool]
+        live_updated_syms = set()
         try:
             live_raw = yf.download(cand_tickers_ns, period="1d", progress=False)
             if live_raw is not None and not live_raw.empty:
@@ -303,12 +326,31 @@ def run_live_preview_pipeline():
                             c_val = None
                         if c_val is not None and pd.notna(c_val) and float(c_val) > 0:
                             item["candidate"]["current_price"] = float(c_val)
+                            live_updated_syms.add(sym)
                             if not item.get("has_vcp"):
                                 item["candidate"]["trigger_price"] = float(c_val)
                     except Exception:
                         pass
         except Exception as e:
             logger.warning(f"Could not fetch live ticks for candidates: {e}")
+
+        # Re-validate MEAN_REVERSION candidates against 200-DMA after live 3:15 PM tick update
+        filtered_pool = []
+        for item in candidate_pool:
+            sym = item["symbol"]
+            cand = item["candidate"]
+            sma_200_val = cand.get("sma_200")
+            if not item.get("has_vcp") and sma_200_val is not None and float(sma_200_val) > 0:
+                cur_p = float(cand["current_price"])
+                sma_p = float(sma_200_val)
+                if (sym in live_updated_syms and cur_p <= sma_p) or (cur_p < sma_p):
+                    logger.info(
+                        f"[{sym}] MEAN_REVERSION candidate rejected in Pass 3: "
+                        f"live price ₹{cur_p:.2f} <= 200-DMA ₹{sma_p:.2f}"
+                    )
+                    continue
+            filtered_pool.append(item)
+        candidate_pool = filtered_pool
 
     # 8. Pass 4: Sort and Shariah Screen (Top-N with Cache First)
     candidate_pool.sort(key=lambda x: (

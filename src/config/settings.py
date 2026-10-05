@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Model IDs for LiteLLM Waterfall
     PRIMARY_LLM: str = "gemini/gemini-flash-latest"
     REASONING_LLM: str = "gemini/gemini-flash-latest"
-    FALLBACK_LLM_1: str = "groq/openai/gpt-oss-120b"
+    FALLBACK_LLM_1: str = "groq/llama-3.3-70b-versatile"
     FALLBACK_LLM_2: str = "openrouter/qwen/qwen3.8-27b:free"
 
     # Telegram Bot

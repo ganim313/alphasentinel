@@ -3,10 +3,10 @@
     "win_rate": 0.0,
     "max_drawdown": 0.0,
     "max_drawdown_pct": 0.0,
-    "sharpe_ratio": 1921.8885070680647,
-    "annualized_sharpe": 1921.8885070680647,
+    "sharpe_ratio": 0.0,
+    "annualized_sharpe": 0.0,
     "n_strategy_trials": 1,
-    "dsr": 0.7023,
-    "pbo": 0.2977,
-    "data_source": "equity_curve"
+    "dsr": 0.0,
+    "pbo": 1.0,
+    "data_source": "positions_only"
 }

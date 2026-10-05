@@ -216,6 +216,10 @@ def fetch_bhavcopy_with_retry_and_fallback(trade_date: date, max_retries: int = 
                 pass
             return pd.DataFrame()
             
+        if fyers_client.model is None and not isinstance(getattr(fyers_client.fetch_historical_data, "return_value", None), pd.DataFrame):
+            logger.warning(f"Fyers client model is None (unauthenticated). Skipping Fyers historical fallback loop for {trade_date}.")
+            return None
+
         dfs = []
         date_str = trade_date.strftime("%Y-%m-%d")
         for sym in symbols:

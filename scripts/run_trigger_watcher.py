@@ -37,14 +37,34 @@ def check_and_execute_triggers() -> int:
         logger.info("System halted. Trigger watcher idle.")
         return 0
 
+    macro_data = {}
     with get_read_connection() as conn:
         rows = conn.execute("""
-            SELECT id, symbol, trigger_price, pattern_type, sector, market_cap_tier, circuit_band
+            SELECT id, symbol, trigger_price, pattern_type, sector, market_cap_tier, circuit_band, adtv_20d
             FROM screener_candidates
             WHERE status = 'AWAITING_TRIGGER'
               AND scan_date >= (CURRENT_DATE - INTERVAL '5 days')
             ORDER BY scan_date ASC
         """).fetchall()
+        try:
+            mw_row = conn.execute("""
+                SELECT us_vix, sp500_pct_change, crude_oil_price, crude_oil_pct_change,
+                       usdinr_price, usdinr_pct_change, polymarket_risk_score,
+                       market_regime, macro_weather_score, target_cash_exposure_pct, source
+                FROM macro_weather
+                ORDER BY scan_date DESC LIMIT 1
+            """).fetchone()
+            if mw_row and len(mw_row) >= 11:
+                macro_data = {
+                    "us_vix": mw_row[0], "sp500_pct_change": mw_row[1],
+                    "crude_oil_price": mw_row[2], "crude_oil_pct_change": mw_row[3],
+                    "usdinr_price": mw_row[4], "usdinr_pct_change": mw_row[5],
+                    "polymarket_risk_score": mw_row[6], "market_regime": mw_row[7],
+                    "macro_weather_score": mw_row[8], "target_cash_exposure_pct": mw_row[9],
+                    "source": mw_row[10],
+                }
+        except Exception as mw_err:
+            logger.debug(f"Could not load macro_weather in trigger watcher: {mw_err}")
 
     if not rows:
         return 0
@@ -63,7 +83,9 @@ def check_and_execute_triggers() -> int:
         logger.warning(f"Error fetching live prices in trigger watcher: {e}")
         return 0
 
-    for cand_id, sym, trigger_p, pattern, sector, mcap_tier, cb in rows:
+    for row in rows:
+        cand_id, sym, trigger_p, pattern, sector, mcap_tier, cb = row[:7]
+        cand_adtv = float(row[7]) if len(row) > 7 and row[7] is not None and float(row[7]) > 0 else 5000000.0
         try:
             col = f"{sym}.NS"
             if len(symbols) == 1:
@@ -77,21 +99,25 @@ def check_and_execute_triggers() -> int:
                 continue
 
             current_p = float(close_series.iloc[-1])
-            high_p = float(high_series.iloc[-1])
+            high_p = float(high_series.max())
 
             if high_p >= trigger_p:
                 logger.info(f"🎯 [{sym}] TRIGGER HIT! High ₹{high_p:.2f} >= Trigger ₹{trigger_p:.2f}")
                 
-                # Fetch recent ATR
+                # Fetch recent ATR and sort chronologically (ascending by trade_date)
                 with get_read_connection() as conn:
                     bhav_df = conn.execute("""
-                        SELECT high_price, low_price, close_price
+                        SELECT trade_date, high_price, low_price, close_price
                         FROM bhavcopy_daily WHERE symbol = ?
                         ORDER BY trade_date DESC LIMIT 20
                     """, (sym,)).df()
                 
                 from src.utils.technical_indicators import atr as calc_atr
                 if not bhav_df.empty and len(bhav_df) >= 5:
+                    if "trade_date" in bhav_df.columns:
+                        bhav_df = bhav_df.sort_values("trade_date", ascending=True).reset_index(drop=True)
+                    else:
+                        bhav_df = bhav_df.iloc[::-1].reset_index(drop=True)
                     atr_val = float(calc_atr(bhav_df['high_price'], bhav_df['low_price'], bhav_df['close_price']).iloc[-1])
                 else:
                     atr_val = current_p * 0.025
@@ -103,8 +129,8 @@ def check_and_execute_triggers() -> int:
                     current_price=current_p,
                     atr_14=atr_val,
                     circuit_band=cb if cb is not None else 20.0,
-                    macro_weather={},
-                    adtv_20d=5000000.0,
+                    macro_weather=macro_data,
+                    adtv_20d=cand_adtv,
                     sector=sector or "",
                     market_cap_tier=mcap_tier or "SMALL",
                     portfolio_capital_rupees=current_capital
@@ -120,6 +146,10 @@ def check_and_execute_triggers() -> int:
                     db_write("UPDATE screener_candidates SET status = 'EXECUTION_REJECTED' WHERE id = ?", (cand_id,))
                     continue
 
+                stop_loss_p = risk_calc.get("stop_loss_price") or round(current_p - 1.8 * atr_val, 2)
+                target_1_p = risk_calc.get("target_1_price") or round(current_p + 3.0 * atr_val, 2)
+                target_2_p = risk_calc.get("target_2_price") or round(current_p + 6.0 * atr_val, 2)
+
                 broker = PaperBroker()
                 order_id = broker.place_order(
                     symbol=sym,
@@ -127,9 +157,9 @@ def check_and_execute_triggers() -> int:
                     quantity=qty,
                     atr=atr_val,
                     sector=sector,
-                    initial_stop=round(current_p - 1.8 * atr_val, 2),
-                    target_1=round(current_p + 3.0 * atr_val, 2),
-                    target_2=round(current_p + 6.0 * atr_val, 2),
+                    initial_stop=float(stop_loss_p),
+                    target_1=float(target_1_p),
+                    target_2=float(target_2_p),
                     candidate_id=cand_id,
                 )
 
