@@ -25,6 +25,23 @@ from src.db.session import init_db, get_read_connection, get_write_connection
 from src.db.queue_writer import db_write
 
 
+@pytest.fixture(autouse=True)
+def cleanup_phase3_db():
+    """Ensure Phase 3 test symbols are cleaned up after each test."""
+    yield
+    try:
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM bhavcopy_daily WHERE symbol LIKE 'P3_SYM_%'")
+            conn.execute(
+                "DELETE FROM agent_memory WHERE symbol IN ('P3_TEST_SYM', 'RECON_TEST_SL', 'RECON_TEST_WIN', 'JUDGE_TEST_SYM') OR symbol LIKE 'P3_%'"
+            )
+            conn.execute(
+                "DELETE FROM positions WHERE symbol IN ('P3_TEST_SYM', 'RECON_TEST_SL', 'RECON_TEST_WIN', 'JUDGE_TEST_SYM') OR symbol LIKE 'P3_%'"
+            )
+    except Exception:
+        pass
+
+
 # -------------------------------------------------------------------------
 # 1. Canonical Technical Indicators (P3-1)
 # -------------------------------------------------------------------------

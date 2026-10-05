@@ -246,7 +246,7 @@ def run_live_preview_pipeline():
                 continue
 
             cur_price = vcp_candidate["current_price"] if vcp_candidate else adtv_map.get(symbol, {}).get("close", 100.0)
-            trig_price = vcp_candidate["trigger_price"] if vcp_candidate else cur_price * 1.015
+            trig_price = vcp_candidate["trigger_price"] if vcp_candidate else cur_price
             pat_type = vcp_candidate["pattern_type"] if vcp_candidate else "MEAN_REVERSION"
             cand_tier = market_cap_tier_map.get(symbol, "SMALL")
 
@@ -300,6 +300,8 @@ def run_live_preview_pipeline():
                             c_val = None
                         if c_val is not None and pd.notna(c_val) and float(c_val) > 0:
                             item["candidate"]["current_price"] = float(c_val)
+                            if not item.get("has_vcp"):
+                                item["candidate"]["trigger_price"] = float(c_val)
                     except Exception:
                         pass
         except Exception as e:
@@ -404,6 +406,7 @@ def run_live_preview_pipeline():
             state_input = {
                 "symbol": str(symbol),
                 "scan_date": today_ist.isoformat(),
+                "pattern_type": str(candidate["pattern_type"]),
                 "current_price": float(candidate["current_price"]),
                 "trigger_price": float(candidate["trigger_price"]),
                 "market_cap_tier": str(tier),
@@ -432,6 +435,7 @@ def run_live_preview_pipeline():
                 "target_1_price": 0.0,
                 "target_2_price": 0.0,
                 "risk_reward_ratio": 0.0,
+                "total_capital_deployed": 0.0,
                 "portfolio_allocation_pct": 0.0,
                 "rejection_reason": None,
                 "telegram_card_markdown": None,
@@ -574,7 +578,17 @@ def run_live_preview_pipeline():
         core_equity = 1000000.0
 
     regime_val = macro_data.get("market_regime") if macro_data else 0
-    regime_desc = "🟢 Bullish (Regime 1 / Uptrend)" if regime_val != 0 else "🔴 Defensive (Regime 0 / Market Correction)"
+    defensive_regimes = {0, "0", "HIGH_RISK", "HIGH_RISK_DEFENSIVE", "BEAR", "CAUTIOUS", "DEFENSIVE", "CRISIS", None, ""}
+    is_bullish = (
+        regime_val not in defensive_regimes
+        and not any(k in str(regime_val).upper() for k in ("HIGH_RISK", "DEFENSIVE", "BEAR", "CAUTIOUS", "CRISIS"))
+    )
+    regime_label = str(regime_val) if regime_val not in (None, "") else ("Regime 1" if is_bullish else "Regime 0")
+    regime_desc = (
+        f"🟢 Bullish ({regime_label} / Uptrend)"
+        if is_bullish
+        else f"🔴 Defensive ({regime_label} / Market Correction)"
+    )
     
     summary_msg = (
         f"📊 <b>AlphaSentinel 3:15 PM Scan Summary</b>\n"

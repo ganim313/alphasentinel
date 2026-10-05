@@ -9,11 +9,13 @@ def _get_benchmark_data():
     if _benchmark_cache is not None:
         return _benchmark_cache
     try:
-        import yfinance as yf
-        bench = yf.Ticker("^NSEI").history(period="1y")
-        if not bench.empty:
+        from src.utils.benchmark_provider import get_benchmark_ohlc
+        bench = get_benchmark_ohlc(lookback_days=400)
+        if bench is not None and not bench.empty:
+            bench = bench.copy()
             bench['rsi'] = calculate_rsi(bench['Close'])
-            bench['regime'] = np.where(bench['Close'] >= bench['Close'].rolling(50).mean(), 1, 0)
+            bench_sma50 = bench['Close'].rolling(50, min_periods=10).mean()
+            bench['regime'] = (bench['Close'] >= bench_sma50).astype(int)
             _benchmark_cache = bench
             return bench
     except Exception:
@@ -96,10 +98,10 @@ def extract_quantitative_features(df):
         
         # Merge regime and rsi
         bench_aligned = bench_copy.reindex(df_dates).ffill()
-        df['market_regime'] = bench_aligned['regime'].fillna(1).values
-        bench_rsi = bench_aligned['rsi'].fillna(50).values
+        df['market_regime'] = bench_aligned['regime'].fillna(0).astype(int).values
+        bench_rsi = bench_aligned['rsi'].fillna(50.0).values
     else:
-        df['market_regime'] = 1
+        df['market_regime'] = 0
         bench_rsi = 50.0
         
     df['rsi'] = calculate_rsi(adj_close)

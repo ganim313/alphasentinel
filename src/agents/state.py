@@ -51,9 +51,11 @@ class AgentState(TypedDict, total=False):
     target_1_price: float
     target_2_price: float
     risk_reward_ratio: float
+    total_capital_deployed: float
     portfolio_allocation_pct: float
     rejection_reason: Optional[str]
     
     # Execution & Human Review
     telegram_card_markdown: Optional[str]
     manual_review_payload: Optional[str]
+

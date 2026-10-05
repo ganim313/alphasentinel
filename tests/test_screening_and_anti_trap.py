@@ -76,36 +76,40 @@ def test_anti_trap_shield_layers():
     init_db()
     symbol = "TEST_TRAP_STOCK"
     
-    # Insert 60 days of distinct synthetic price data
-    base_date = date(2026, 1, 1)
-    from datetime import timedelta
-    for i in range(60):
-        price = 100.0 + (i * 0.5)
-        trade_date = base_date + timedelta(days=i)
-        db_write("""
-            INSERT OR REPLACE INTO bhavcopy_daily (
-                symbol, trade_date, series, open_price, high_price, low_price, 
-                close_price, prev_close, total_traded_qty, total_traded_val, 
-                delivery_qty, delivery_pct, split_multiplier
-            ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
-        """, (symbol, trade_date, price, price+1, price-1, price, price-0.5), sync=True)
+    try:
+        # Insert 60 days of distinct synthetic price data
+        base_date = date(2026, 1, 1)
+        from datetime import timedelta
+        for i in range(60):
+            price = 100.0 + (i * 0.5)
+            trade_date = base_date + timedelta(days=i)
+            db_write("""
+                INSERT OR REPLACE INTO bhavcopy_daily (
+                    symbol, trade_date, series, open_price, high_price, low_price, 
+                    close_price, prev_close, total_traded_qty, total_traded_val, 
+                    delivery_qty, delivery_pct, split_multiplier
+                ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
+            """, (symbol, trade_date, price, price+1, price-1, price, price-0.5), sync=True)
 
-    # 1. Test Pivot Extension Trap (>5% above trigger)
-    candidate = {"trigger_price": 100.0, "sma_50": 115.0} # Current price is ~130.0 (30% above trigger)
-    passed, reason, metrics = evaluate_anti_trap_shield(symbol, candidate, {"pe_ratio": 22.0, "sector_pe": 25.0})
-    assert not passed
-    assert reason == "TRAP_L1_PIVOT_EXTENDED"
+        # 1. Test Pivot Extension Trap (>5% above trigger)
+        candidate = {"trigger_price": 100.0, "sma_50": 115.0} # Current price is ~130.0 (30% above trigger)
+        passed, reason, metrics = evaluate_anti_trap_shield(symbol, candidate, {"pe_ratio": 22.0, "sector_pe": 25.0})
+        assert not passed
+        assert reason == "TRAP_L1_PIVOT_EXTENDED"
 
-    # 2. Test P/E Overvaluation Trap (>2.5x Sector P/E) - Currently DISABLED
-    candidate_fair = {"trigger_price": 128.0, "sma_50": 120.0}
-    passed, reason, metrics = evaluate_anti_trap_shield(symbol, candidate_fair, {"pe_ratio": 95.0, "sector_pe": 25.0})
-    assert passed
-    assert reason == "PASSED_ALL_ANTI_TRAP_LAYERS"
+        # 2. Test P/E Overvaluation Trap (>2.5x Sector P/E) - Currently DISABLED
+        candidate_fair = {"trigger_price": 128.0, "sma_50": 120.0}
+        passed, reason, metrics = evaluate_anti_trap_shield(symbol, candidate_fair, {"pe_ratio": 95.0, "sector_pe": 25.0})
+        assert passed
+        assert reason == "PASSED_ALL_ANTI_TRAP_LAYERS"
 
-    print("\n[PASS] Anti-Trap Shield layers verified successfully!")
+        print("\n[PASS] Anti-Trap Shield layers verified successfully!")
+    finally:
+        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (symbol,), sync=True)
 
 
 if __name__ == "__main__":
     test_liquidity_guard_t2t_and_adtv()
     test_shariah_compliance_gate()
     test_anti_trap_shield_layers()
+

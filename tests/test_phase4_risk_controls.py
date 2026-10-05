@@ -39,6 +39,11 @@ from scripts.run_eod_reconciliation import run_eod_reconciliation_pipeline
 def setup_db():
     """Ensure database tables exist and clean up test fixtures."""
     init_db()
+    with get_read_connection() as conn:
+        saved_today_eq = conn.execute(
+            "SELECT trade_date, total_equity, core_equity, unrealized_pnl "
+            "FROM equity_curve WHERE trade_date = CURRENT_DATE"
+        ).fetchall()
     yield
     # Cleanup after test
     with get_write_connection() as conn:
@@ -48,6 +53,12 @@ def setup_db():
         conn.execute("DELETE FROM promoter_pledge_history WHERE symbol LIKE 'TEST_%'")
         conn.execute("DELETE FROM fundamentals_cache WHERE symbol LIKE 'TEST_%'")
         conn.execute("DELETE FROM equity_curve WHERE trade_date = CURRENT_DATE")
+        for row in saved_today_eq:
+            conn.execute(
+                "INSERT OR REPLACE INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
+                "VALUES (?, ?, ?, ?)",
+                list(row),
+            )
 
 
 # -------------------------------------------------------------------------
@@ -170,38 +181,49 @@ def test_correlation_guard_allows_uncorrelated_candidate():
 
 def test_correlation_guard_fails_open_safely():
     """Asserts missing history or zero open positions safely passes (fails open)."""
-    # 1. No open positions in DB for candidate
-    with get_write_connection() as conn:
-        conn.execute("DELETE FROM positions")
-    
-    passed, reason, metrics = evaluate_correlation_guard("TEST_EMPTY_PORT")
-    assert passed is True
-    assert "CORR_GUARD_SKIPPED" in reason
+    with get_read_connection() as conn:
+        saved_positions_df = conn.execute("SELECT * FROM positions WHERE symbol NOT LIKE 'TEST_%'").df()
 
-    # 2. Open position exists but candidate has insufficient history (<15 days)
-    with get_write_connection() as conn:
-        conn.execute("""
-            INSERT INTO positions (
-                id, symbol, entry_date, entry_price, quantity, current_ltp,
-                atr, trailing_stop_loss, target_1, target_2, risk_rupees,
-                portfolio_allocation_pct, status
-            ) VALUES (
-                'pos_short_hist', 'TEST_OPEN_1', CURRENT_DATE, 100.0, 50, 100.0,
-                2.0, 95.0, 110.0, 120.0, 250.0, 5.0, 'OPEN'
-            );
-        """)
-        for i in range(5):
-            t_date = datetime.date.today() - datetime.timedelta(days=i)
+    try:
+        # 1. No open positions in DB for candidate
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM positions")
+        
+        passed, reason, metrics = evaluate_correlation_guard("TEST_EMPTY_PORT")
+        assert passed is True
+        assert "CORR_GUARD_SKIPPED" in reason
+
+        # 2. Open position exists but candidate has insufficient history (<15 days)
+        with get_write_connection() as conn:
             conn.execute("""
-                INSERT INTO bhavcopy_daily (
-                    symbol, trade_date, open_price, high_price, low_price, close_price,
-                    total_traded_qty, total_traded_val
-                ) VALUES ('TEST_SHORT', ?, 100.0, 102.0, 99.0, 100.0, 10000, 1000000.0);
-            """, (t_date,))
+                INSERT INTO positions (
+                    id, symbol, entry_date, entry_price, quantity, current_ltp,
+                    atr, trailing_stop_loss, target_1, target_2, risk_rupees,
+                    portfolio_allocation_pct, status
+                ) VALUES (
+                    'pos_short_hist', 'TEST_OPEN_1', CURRENT_DATE, 100.0, 50, 100.0,
+                    2.0, 95.0, 110.0, 120.0, 250.0, 5.0, 'OPEN'
+                );
+            """)
+            for i in range(5):
+                t_date = datetime.date.today() - datetime.timedelta(days=i)
+                conn.execute("""
+                    INSERT INTO bhavcopy_daily (
+                        symbol, trade_date, open_price, high_price, low_price, close_price,
+                        total_traded_qty, total_traded_val
+                    ) VALUES ('TEST_SHORT', ?, 100.0, 102.0, 99.0, 100.0, 10000, 1000000.0);
+                """, (t_date,))
 
-    passed, reason, metrics = evaluate_correlation_guard("TEST_SHORT")
-    assert passed is True
-    assert "CORR_GUARD_SKIPPED" in reason
+        passed, reason, metrics = evaluate_correlation_guard("TEST_SHORT")
+        assert passed is True
+        assert "CORR_GUARD_SKIPPED" in reason
+    finally:
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM positions WHERE symbol LIKE 'TEST_%'")
+            if not saved_positions_df.empty:
+                conn.register("saved_pos_df", saved_positions_df)
+                conn.execute("INSERT OR REPLACE INTO positions SELECT * FROM saved_pos_df")
+                conn.unregister("saved_pos_df")
 
 
 # -------------------------------------------------------------------------

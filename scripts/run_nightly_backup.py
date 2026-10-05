@@ -66,30 +66,6 @@ def _enforce_retention(s3_client, bucket: str, retention_days: int = 30) -> None
         logger.warning(f"Error enforcing retention policy: {e}")
 
 
-def run_backup() -> str:
-    """
-    Checkpoint DuckDB WAL, stage a copy, upload to B2, verify, and enforce retention.
-    Returns the backup filename.
-    """
-    STAGING_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"alphasentinel_{timestamp}.duckdb"
-    staging_path = STAGING_DIR / backup_filename
-
-    # Step 1: Force WAL checkpoint so the DB file is safe to copy
-    try:
-        if Path(DB_PATH).exists():
-            with duckdb.connect(DB_PATH, read_only=False) as con:
-                con.execute("CHECKPOINT;")
-            logger.info("DuckDB WAL checkpoint completed.")
-        else:
-            logger.info(f"Database file {DB_PATH} not yet created on disk. Skipping backup.")
-            return ""
-    except Exception as e:
-        logger.error(f"DuckDB WAL checkpoint failed: {e}")
-        send_telegram_alert(f"🚨 [run_nightly_backup] WAL checkpoint failed: {e}")
-        raise
-
 BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
 
 
@@ -134,6 +110,9 @@ def run_backup() -> str:
     local_size = os.path.getsize(dest_path)
     logger.info(f"DB backed up at {dest_path} ({local_size / 1024 / 1024:.2f} MB)")
 
+    # Always enforce local retention regardless of cloud upload status
+    _enforce_local_retention(BACKUP_DIR, settings.BACKUP_RETENTION_DAYS)
+
     # Step 3: Check if Cloud S3 / B2 upload is configured
     has_b2 = bool(settings.B2_KEY_ID and settings.B2_APPLICATION_KEY)
     if has_b2:
@@ -160,7 +139,6 @@ def run_backup() -> str:
             raise
     else:
         logger.info(f"B2 credentials not configured. Maintained local backup in {BACKUP_DIR}")
-        _enforce_local_retention(BACKUP_DIR, settings.BACKUP_RETENTION_DAYS)
         send_telegram_alert(
             f"✅ Nightly Local Backup Complete: {backup_filename} "
             f"({local_size / 1024 / 1024:.2f} MB preserved on VM disk)"

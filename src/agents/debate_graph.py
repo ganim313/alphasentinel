@@ -58,6 +58,7 @@ def deterministic_risk_node(state: AgentState) -> Dict[str, Any]:
         return {
             "risk_verdict": "REJECT",
             "suggested_shares": 0,
+            "total_capital_deployed": 0.0,
             "rejection_reason": corr_reason,
             "messages": [AIMessage(content=f"Deterministic Risk Arbiter: REJECT. Reason: {corr_reason}")]
         }
@@ -84,44 +85,82 @@ def deterministic_risk_node(state: AgentState) -> Dict[str, Any]:
         "target_1_price": risk_result.get("target_1_price", 0.0),
         "target_2_price": risk_result.get("target_2_price", 0.0),
         "risk_reward_ratio": risk_result.get("risk_reward_ratio", 0.0),
+        "total_capital_deployed": risk_result.get("total_capital_deployed", 0.0),
         "portfolio_allocation_pct": risk_result.get("portfolio_allocation_pct", 0.0),
         "rejection_reason": risk_result.get("rejection_reason", ""),
         "messages": [AIMessage(content=f"Deterministic Risk Arbiter: {verdict}. Reason: {risk_result.get('rejection_reason')}")]
     }
 
 
+def _resolve_setup_pattern(state: AgentState) -> tuple[str, bool]:
+    """Determines canonical pattern label and whether the candidate is a MEAN_REVERSION setup."""
+    raw_pattern = state.get("pattern_type")
+    if not raw_pattern:
+        if state.get("vcp_signal"):
+            raw_pattern = "VCP Stage 2"
+        elif state.get("mr_signal"):
+            raw_pattern = "MEAN_REVERSION"
+        else:
+            raw_pattern = "VCP Stage 2"
+    is_mr = (str(raw_pattern).upper() == "MEAN_REVERSION") or (
+        bool(state.get("mr_signal")) and not bool(state.get("vcp_signal")) and not state.get("pattern_type")
+    )
+    return str(raw_pattern), is_mr
+
+
 def bull_analyst_node(state: AgentState) -> Dict[str, Any]:
     """
     Bull Analyst: Builds the strongest evidence-based upside case.
-    Ingests VCP contraction, volume surge, Screener.in growth, and TradingView ratings.
+    Pattern-aware: Evaluates VCP Stage 2 breakouts or Oversold 200-DMA Structural Uptrend Pullbacks.
     """
     symbol = state.get("symbol", "UNKNOWN")
     tv = state.get("tv_technical_rating", {})
     tv_rec = tv.get("recommendation", "NEUTRAL") if tv else "NEUTRAL"
     funds = state.get("fundamentals", {})
-    
+    pattern, is_mr = _resolve_setup_pattern(state)
+
+    if is_mr:
+        setup_desc = "Oversold 200-DMA Structural Uptrend Pullback (RSI < 30 above 200-DMA)"
+        focus_instr = (
+            "Evaluate this candidate as an Oversold 200-DMA Structural Uptrend Pullback (RSI < 30 above 200-DMA) "
+            "rather than penalizing it for lacking a VCP Stage 2 volume breakout. "
+            "Format your response as exactly 3 concise bullet points focusing on structural 200-DMA uptrend support, "
+            "oversold RSI mean-reversion asymmetry, and fundamental earnings resilience."
+        )
+        sys_msg = (
+            "You are a quantitative swing trader identifying high-probability Oversold 200-DMA Structural Uptrend "
+            "Pullback (RSI < 30 above 200-DMA) mean-reversion setups."
+        )
+    else:
+        setup_desc = "Confirmed VCP Stage 2" if state.get("vcp_signal") else f"Standard Trend ({pattern})"
+        focus_instr = (
+            "Format your response as exactly 3 concise bullet points focusing on volume accumulation, "
+            "pattern catalyst, and earnings momentum."
+        )
+        sys_msg = "You are a quantitative swing trader identifying high-probability Stage 2 momentum breakouts."
+
     prompt = f"""You are the Lead Bull Quantitative Analyst for an Indian Equity Fund.
 Analyze {symbol} and construct a crisp 3-bullet upside thesis.
 
 Technical Setup:
+- Pattern Type: {pattern} ({setup_desc})
 - Trigger Price: ₹{state.get('trigger_price', 0)}
 - 20D ADTV: ₹{state.get('adtv_20d', 0):,.0f}
 - TradingView Consensus: {tv_rec}
-- VCP Contraction: {'Confirmed' if state.get('vcp_signal') else 'Standard Trend'}
 
 Fundamentals:
 - P/E: {funds.get('pe_ratio', 'N/A')}
 - ROCE: {funds.get('roce_pct', 'N/A')}%
 - QoQ Profit Growth: {funds.get('profit_growth_pct', 'N/A')}%
 
-Format your response as exactly 3 concise bullet points focusing on volume accumulation, pattern catalyst, and earnings momentum."""
+{focus_instr}"""
 
     feedback = get_latest_strategy_feedback()
     if feedback:
         prompt += f"\n\nSTRATEGY FEEDBACK (from last weekly review):\n{feedback}"
 
     messages = [
-        {"role": "system", "content": "You are a quantitative swing trader identifying high-probability Stage 2 momentum breakouts."},
+        {"role": "system", "content": sys_msg},
         {"role": "user", "content": prompt}
     ]
     
@@ -135,17 +174,35 @@ Format your response as exactly 3 concise bullet points focusing on volume accum
 def bear_hunter_node(state: AgentState) -> Dict[str, Any]:
     """
     Bear Trap Hunter: Actively hunts for fatal downside flaws.
-    Searches for pivot extension, overhead resistance, promoter pledge, and macro storm risks.
+    Pattern-aware: Stress-tests VCP breakouts or Oversold 200-DMA Structural Uptrend Pullbacks.
     """
     symbol = state.get("symbol", "UNKNOWN")
     weather = state.get("macro_weather", {})
     funds = state.get("fundamentals", {})
     bull_case = state.get("bull_thesis", "N/A")
-    
+    pattern, is_mr = _resolve_setup_pattern(state)
+
+    if is_mr:
+        pattern_context = "Oversold 200-DMA Structural Uptrend Pullback (RSI < 30 above 200-DMA)"
+        bear_instr = (
+            "Evaluate this setup as an Oversold 200-DMA Structural Uptrend Pullback (RSI < 30 above 200-DMA) "
+            "rather than penalizing it for lacking a VCP Stage 2 volume breakout. "
+            "Format your response as exactly 3 concise bullet points outlining specific mean-reversion trap risks "
+            "(e.g. structural 200-DMA breakdown / falling-knife risk, fundamental catalyst behind the selloff, "
+            "liquidity trap, or macro headwind)."
+        )
+    else:
+        pattern_context = pattern
+        bear_instr = (
+            "Format your response as exactly 3 concise bullet points outlining specific trap risks "
+            "(e.g. liquidity trap, valuation saturation, operator pump risk, macro headwind)."
+        )
+
     prompt = f"""You are the Adversarial Bear Trap Hunter for an Indian Equity Quant Desk.
 Your mission is to aggressively stress-test this setup for {symbol} and identify 3 potential red flags or failure modes.
 
 Setup Context:
+- Pattern: {pattern} ({pattern_context})
 - Current Trigger: ₹{state.get('trigger_price', 0)}
 - Circuit Band: {state.get('circuit_band', 20)}%
 - Macro Regime: {weather.get('market_regime', 'NEUTRAL')} (US VIX: {weather.get('us_vix', 'N/A')})
@@ -155,14 +212,14 @@ Setup Context:
 Bull Case to Challenge:
 {bull_case}
 
-Format your response as exactly 3 concise bullet points outlining specific trap risks (e.g. liquidity trap, valuation saturation, operator pump risk, macro headwind)."""
+{bear_instr}"""
 
     feedback = get_latest_strategy_feedback()
     if feedback:
         prompt += f"\n\nSTRATEGY FEEDBACK (from last weekly review):\n{feedback}"
 
     messages = [
-        {"role": "system", "content": "You are a skeptical quant risk auditor hunting for false breakouts and liquidity traps in Indian small-caps."},
+        {"role": "system", "content": "You are a skeptical quant risk auditor hunting for false setups and liquidity traps in Indian equities."},
         {"role": "user", "content": prompt}
     ]
     
@@ -187,8 +244,18 @@ def research_judge_node(state: AgentState) -> Dict[str, Any]:
     target_1 = state.get("target_1_price", 0.0)
     adtv = state.get("adtv_20d", 0.0)
     circuit_band = state.get("circuit_band", "N/A")
-    pattern = state.get("pattern_type", "VCP Stage 2")
-    
+    pattern, is_mr = _resolve_setup_pattern(state)
+
+    if is_mr:
+        pattern_guidance = (
+            "\nPATTERN EVALUATION GUIDANCE:\n"
+            "This setup is a MEAN_REVERSION candidate — an Oversold 200-DMA Structural Uptrend Pullback "
+            "(RSI < 30 above 200-DMA). Evaluate it as an Oversold 200-DMA Structural Uptrend Pullback "
+            "rather than penalizing it for lacking a VCP Stage 2 volume breakout.\n"
+        )
+    else:
+        pattern_guidance = ""
+
     prompt = f"""You are the Chief Quantitative Research Judge.
 Evaluate the Bull Thesis and Bear Critique for {symbol} impartially against ground-truth quantitative data.
 
@@ -198,7 +265,7 @@ GROUND-TRUTH QUANTITATIVE DATA:
 - 20-Day ADTV: ₹{adtv:,.0f} | Circuit Band: {circuit_band}%
 - Profit Growth: {fundamentals.get('profit_growth_pct', 'N/A')}% | Sales Growth: {fundamentals.get('sales_growth_pct', 'N/A')}%
 - Debt / Assets: {fundamentals.get('debt_to_assets', 'N/A')} | Promoter Pledge: {fundamentals.get('pledged_pct', 'N/A')}%
-
+{pattern_guidance}
 BULL THESIS:
 {bull}
 
@@ -260,7 +327,7 @@ CONVICTION_SCORE: [e.g. 7.5]"""
         """, (
             symbol,
             today_date,
-            state.get("pattern_type", "VCP_STAGE_2"),
+            state.get("pattern_type") or pattern,
             state.get("risk_verdict", "APPROVE"),
             state.get("rejection_reason", ""),
             state.get("bear_risks", ""),

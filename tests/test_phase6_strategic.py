@@ -41,9 +41,11 @@ def setup_test_db(tmp_path, monkeypatch):
     monkeypatch.setattr("src.db.session.get_db_path", lambda: test_db)
     monkeypatch.setattr("scripts.run_nightly_backup.DB_PATH", test_db)
     monkeypatch.setattr("scripts.run_nightly_backup.STAGING_DIR", tmp_path / "staging")
+    monkeypatch.setattr("scripts.run_nightly_backup.BACKUP_DIR", tmp_path / "backups")
     clear_benchmark_cache()
     init_db()
     yield test_db
+
 
 
 # ============================================================================

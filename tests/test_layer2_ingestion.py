@@ -9,24 +9,27 @@ from src.db.queue_writer import db_write, db_transaction
 
 def test_corporate_action_math():
     today = datetime.date.today()
-    
-    # 1:10 split (1 old -> 10 new)
-    id1 = record_corporate_action('TEST_SPLIT', 'SPLIT', today, 1.0, 10.0)
-    with get_read_connection() as conn:
-        m1 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id1,)).fetchone()[0]
-        assert round(m1, 4) == 0.1000
-    
-    # 5:1 reverse split (5 old -> 1 new)
-    id2 = record_corporate_action('TEST_REV_SPLIT', 'SPLIT', today, 5.0, 1.0)
-    with get_read_connection() as conn:
-        m2 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id2,)).fetchone()[0]
-        assert round(m2, 4) == 5.0000
-    
-    # 2:1 bonus (2 bonus shares for 1 existing -> total 3)
-    id3 = record_corporate_action('TEST_BONUS', 'BONUS', today, 2.0, 1.0)
-    with get_read_connection() as conn:
-        m3 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id3,)).fetchone()[0]
-        assert round(m3, 4) == round(1.0 / 3.0, 4)
+    try:
+        # 1:10 split (1 old -> 10 new)
+        id1 = record_corporate_action('TEST_SPLIT', 'SPLIT', today, 1.0, 10.0)
+        with get_read_connection() as conn:
+            m1 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id1,)).fetchone()[0]
+            assert round(m1, 4) == 0.1000
+        
+        # 5:1 reverse split (5 old -> 1 new)
+        id2 = record_corporate_action('TEST_REV_SPLIT', 'SPLIT', today, 5.0, 1.0)
+        with get_read_connection() as conn:
+            m2 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id2,)).fetchone()[0]
+            assert round(m2, 4) == 5.0000
+        
+        # 2:1 bonus (2 bonus shares for 1 existing -> total 3)
+        id3 = record_corporate_action('TEST_BONUS', 'BONUS', today, 2.0, 1.0)
+        with get_read_connection() as conn:
+            m3 = conn.execute('SELECT adjustment_multiplier FROM corporate_actions WHERE id = ?', (id3,)).fetchone()[0]
+            assert round(m3, 4) == round(1.0 / 3.0, 4)
+    finally:
+        db_write("DELETE FROM corporate_actions WHERE symbol IN ('TEST_SPLIT', 'TEST_REV_SPLIT', 'TEST_BONUS');", sync=True)
+
 
 def test_tradingview_clean_symbol_prefix():
     res = get_tradingview_technical_ratings('NSE:INFY')

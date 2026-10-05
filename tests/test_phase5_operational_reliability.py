@@ -39,14 +39,39 @@ from dashboard.app import get_scheduler_status, PROJECT_ROOT
 
 @pytest.fixture(autouse=True)
 def setup_db():
-    """Ensure database tables exist and clean up test fixtures."""
+    """Ensure database tables exist and clean up test fixtures without destroying production rows."""
     init_db()
+    with get_read_connection() as conn:
+        saved_equity_curve = conn.execute(
+            "SELECT trade_date, total_equity, core_equity, unrealized_pnl FROM equity_curve"
+        ).fetchall()
+        saved_market_memory = conn.execute(
+            "SELECT symbol, memory_date, pattern_type, previous_verdict, rejection_reason, "
+            "bear_flags_noted, kronos_score, conviction_score, content, outcome_label, "
+            "triple_barrier_label, outcome_3d_pct, created_at "
+            "FROM agent_memory WHERE symbol = 'MARKET_WIDE'"
+        ).fetchall()
     yield
-    # Cleanup after test
+    # Cleanup after test and restore pre-existing rows
     with get_write_connection() as conn:
         conn.execute("DELETE FROM positions WHERE symbol LIKE 'TEST_%'")
         conn.execute("DELETE FROM agent_memory WHERE symbol = 'MARKET_WIDE'")
-        conn.execute("DELETE FROM equity_curve WHERE trade_date >= '2026-01-01'")
+        for row in saved_market_memory:
+            conn.execute(
+                "INSERT OR REPLACE INTO agent_memory ("
+                "symbol, memory_date, pattern_type, previous_verdict, rejection_reason, "
+                "bear_flags_noted, kronos_score, conviction_score, content, outcome_label, "
+                "triple_barrier_label, outcome_3d_pct, created_at"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                list(row),
+            )
+        conn.execute("DELETE FROM equity_curve WHERE trade_date >= '2026-09-01' AND trade_date <= '2026-09-10'")
+        for row in saved_equity_curve:
+            conn.execute(
+                "INSERT OR REPLACE INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
+                "VALUES (?, ?, ?, ?)",
+                list(row),
+            )
 
 
 # -------------------------------------------------------------------------
@@ -165,31 +190,58 @@ def test_run_evaluator_generates_portfolio_metrics(tmp_path):
 
 def test_run_evaluator_uses_equity_curve_when_available():
     """Asserts evaluator uses continuous equity_curve time-series when >=5 rows exist."""
-    with get_write_connection() as conn:
-        conn.execute("DELETE FROM equity_curve WHERE trade_date >= '2026-09-01'")
-        for i in range(1, 11):
-            date_str = f"2026-09-{i:02d}"
-            eq_val = 1000000.0 + (i * 2000.0)
-            conn.execute(
-                "INSERT INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
-                "VALUES (?, ?, ?, ?)",
-                [date_str, eq_val, eq_val, 0.0]
-            )
+    with get_read_connection() as conn:
+        existing_rows = conn.execute(
+            "SELECT trade_date, total_equity, core_equity, unrealized_pnl FROM equity_curve"
+        ).fetchall()
+    try:
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM equity_curve")
+            for i in range(1, 11):
+                date_str = f"2026-09-{i:02d}"
+                eq_val = 1000000.0 + (i * 2000.0)
+                conn.execute(
+                    "INSERT OR REPLACE INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
+                    "VALUES (?, ?, ?, ?)",
+                    [date_str, eq_val, eq_val, 0.0]
+                )
 
-    metrics = calculate_portfolio_metrics()
-    assert metrics["data_source"] == "equity_curve"
-    assert isinstance(metrics["annualized_sharpe"], float)
-    assert isinstance(metrics["max_drawdown_pct"], float)
-    assert metrics["annualized_sharpe"] > 0.0  # Steady upward equity curve should yield positive Sharpe
+        metrics = calculate_portfolio_metrics()
+        assert metrics["data_source"] == "equity_curve"
+        assert isinstance(metrics["annualized_sharpe"], float)
+        assert isinstance(metrics["max_drawdown_pct"], float)
+        assert metrics["annualized_sharpe"] > 0.0  # Steady upward equity curve should yield positive Sharpe
+    finally:
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM equity_curve WHERE trade_date >= '2026-09-01' AND trade_date <= '2026-09-10'")
+            for row in existing_rows:
+                conn.execute(
+                    "INSERT OR REPLACE INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
+                    "VALUES (?, ?, ?, ?)",
+                    list(row),
+                )
 
 
 def test_calculate_portfolio_metrics_fallback_positions_only():
     """Asserts evaluator falls back to positions-only calculation when <5 equity_curve rows exist."""
-    with get_write_connection() as conn:
-        conn.execute("DELETE FROM equity_curve WHERE trade_date >= '2026-01-01'")
-    
-    metrics = calculate_portfolio_metrics()
-    assert metrics["data_source"] == "positions_only"
+    with get_read_connection() as conn:
+        existing_rows = conn.execute(
+            "SELECT trade_date, total_equity, core_equity, unrealized_pnl FROM equity_curve"
+        ).fetchall()
+    try:
+        with get_write_connection() as conn:
+            conn.execute("DELETE FROM equity_curve")
+
+        metrics = calculate_portfolio_metrics()
+        assert metrics["data_source"] == "positions_only"
+    finally:
+        with get_write_connection() as conn:
+            for row in existing_rows:
+                conn.execute(
+                    "INSERT OR REPLACE INTO equity_curve (trade_date, total_equity, core_equity, unrealized_pnl) "
+                    "VALUES (?, ?, ?, ?)",
+                    list(row),
+                )
 
 
 def test_weekly_evaluator_scheduled_in_run_scheduler():

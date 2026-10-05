@@ -85,36 +85,39 @@ def test_gate_approval_and_veto_thresholds():
     init_db()
     symbol = "TEST_GATE_STOCK"
     
-    # Insert 60 days of synthetic price data
-    base_date = date(2026, 1, 1)
-    for i in range(60):
-        price = 100.0 + (i * 0.5)
-        trade_date = base_date + timedelta(days=i)
-        db_write("""
-            INSERT OR REPLACE INTO bhavcopy_daily (
-                symbol, trade_date, series, open_price, high_price, low_price, 
-                close_price, prev_close, total_traded_qty, total_traded_val, 
-                delivery_qty, delivery_pct, split_multiplier
-            ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
-        """, (symbol, trade_date, price, price+1, price-1, price, price-0.5), sync=True)
+    try:
+        # Insert 60 days of synthetic price data
+        base_date = date(2026, 1, 1)
+        for i in range(60):
+            price = 100.0 + (i * 0.5)
+            trade_date = base_date + timedelta(days=i)
+            db_write("""
+                INSERT OR REPLACE INTO bhavcopy_daily (
+                    symbol, trade_date, series, open_price, high_price, low_price, 
+                    close_price, prev_close, total_traded_qty, total_traded_val, 
+                    delivery_qty, delivery_pct, split_multiplier
+                ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
+            """, (symbol, trade_date, price, price+1, price-1, price, price-0.5), sync=True)
 
-    # 1. Test prob = 0.65 -> Approved (True)
-    mock_model_pass = MagicMock()
-    mock_model_pass.predict_proba.return_value = np.array([[0.35, 0.65]])
-    with patch.object(gate, "get_champion_model", return_value=mock_model_pass):
-        assert gate.evaluate_second_opinion(symbol) is True
+        # 1. Test prob = 0.65 -> Approved (True)
+        mock_model_pass = MagicMock()
+        mock_model_pass.predict_proba.return_value = np.array([[0.35, 0.65]])
+        with patch.object(gate, "get_champion_model", return_value=mock_model_pass):
+            assert gate.evaluate_second_opinion(symbol) is True
 
-    # 2. Test prob = 0.50 -> Vetoed (False) (threshold requires > 0.50)
-    mock_model_boundary = MagicMock()
-    mock_model_boundary.predict_proba.return_value = np.array([[0.50, 0.50]])
-    with patch.object(gate, "get_champion_model", return_value=mock_model_boundary):
-        assert gate.evaluate_second_opinion(symbol) is False
+        # 2. Test prob = 0.50 -> Vetoed (False) (threshold requires > 0.50)
+        mock_model_boundary = MagicMock()
+        mock_model_boundary.predict_proba.return_value = np.array([[0.50, 0.50]])
+        with patch.object(gate, "get_champion_model", return_value=mock_model_boundary):
+            assert gate.evaluate_second_opinion(symbol) is False
 
-    # 3. Test prob = 0.42 -> Vetoed (False)
-    mock_model_veto = MagicMock()
-    mock_model_veto.predict_proba.return_value = np.array([[0.58, 0.42]])
-    with patch.object(gate, "get_champion_model", return_value=mock_model_veto):
-        assert gate.evaluate_second_opinion(symbol) is False
+        # 3. Test prob = 0.42 -> Vetoed (False)
+        mock_model_veto = MagicMock()
+        mock_model_veto.predict_proba.return_value = np.array([[0.58, 0.42]])
+        with patch.object(gate, "get_champion_model", return_value=mock_model_veto):
+            assert gate.evaluate_second_opinion(symbol) is False
+    finally:
+        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (symbol,), sync=True)
 
 
 def test_live_model_evaluation_on_test_symbol():
@@ -123,10 +126,26 @@ def test_live_model_evaluation_on_test_symbol():
         pytest.skip("xgboost_global.pkl not present on disk")
         
     init_db()
-    # Reset cached model to force load from disk
-    gate._model_loaded = False
-    gate._cached_model = None
-    
-    # Evaluate TEST_TRAP_STOCK (which has 60 rows)
-    res = gate.evaluate_second_opinion("TEST_TRAP_STOCK")
-    assert isinstance(res, bool)
+    symbol = "TEST_TRAP_STOCK"
+    try:
+        base_date = date(2026, 1, 1)
+        for i in range(60):
+            price = 100.0 + (i * 0.5)
+            trade_date = base_date + timedelta(days=i)
+            db_write("""
+                INSERT OR REPLACE INTO bhavcopy_daily (
+                    symbol, trade_date, series, open_price, high_price, low_price, 
+                    close_price, prev_close, total_traded_qty, total_traded_val, 
+                    delivery_qty, delivery_pct, split_multiplier
+                ) VALUES (?, ?, 'EQ', ?, ?, ?, ?, ?, 10000, 1000000.0, 5000, 50.0, 1.0);
+            """, (symbol, trade_date, price, price+1, price-1, price, price-0.5), sync=True)
+
+        # Reset cached model to force load from disk
+        gate._model_loaded = False
+        gate._cached_model = None
+        
+        res = gate.evaluate_second_opinion(symbol)
+        assert isinstance(res, bool)
+    finally:
+        db_write("DELETE FROM bhavcopy_daily WHERE symbol = ?;", (symbol,), sync=True)
+
