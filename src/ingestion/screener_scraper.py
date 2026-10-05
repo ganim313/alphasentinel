@@ -39,8 +39,9 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             """, (symbol,)).fetchone()
             if row:
                 cached = json.loads(row[0])
-                cached["source"] = "DB_CACHE_FIRST"
-                return cached
+                if cached.get("sector_name"):
+                    cached["source"] = "DB_CACHE_FIRST"
+                    return cached
     except Exception as e:
         logger.warning(f"Failed to read fundamentals_cache for {symbol}: {e}")
 
@@ -216,6 +217,51 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         if trade_receivables <= 0.0:
             trade_receivables = get_row_last_val('balance-sheet', 'receivables')
 
+        # Screener.in nests Inventories and Trade receivables inside the 'Other Assets' schedule JSON
+        if inventories <= 0.0 or trade_receivables <= 0.0:
+            company_info_el = soup.find("div", id="company-info")
+            company_id = company_info_el.get("data-company-id") if company_info_el else None
+            if company_id:
+                try:
+                    is_cons = company_info_el.get("data-consolidated") == "true"
+                    sched_url = (
+                        f"https://www.screener.in/api/company/{company_id}/schedules/"
+                        f"?parent=Other+Assets&section=balance-sheet"
+                        + ("&consolidated=" if is_cons else "")
+                    )
+                    sched_resp = requests.get(
+                        sched_url, headers=headers, timeout=settings.REQUEST_TIMEOUT_SECONDS
+                    )
+                    if getattr(sched_resp, "status_code", None) == 200:
+                        sched_data = sched_resp.json()
+                        if isinstance(sched_data, dict):
+                            def _last_sched_num(row_dict: Any) -> float:
+                                if not isinstance(row_dict, dict):
+                                    return 0.0
+                                for k, v in reversed(list(row_dict.items())):
+                                    if k == "isExpandable":
+                                        continue
+                                    try:
+                                        return float(str(v).replace(",", "").strip())
+                                    except (ValueError, TypeError):
+                                        continue
+                                return 0.0
+
+                            for k_name, row_dict in sched_data.items():
+                                k_low = str(k_name).lower()
+                                if inventories <= 0.0 and ("inventor" in k_low):
+                                    inventories = _last_sched_num(row_dict)
+                                elif trade_receivables <= 0.0 and ("receivable" in k_low or "debtor" in k_low):
+                                    trade_receivables = _last_sched_num(row_dict)
+                except Exception as sched_err:
+                    logger.debug(f"Could not fetch Other Assets schedule for {symbol}: {sched_err}")
+
+        # Fallback to Ratios section Debtor Days if trade_receivables still 0.0
+        if trade_receivables <= 0.0 and sales > 0.0:
+            debtor_days = get_row_last_val('ratios', 'debtor days')
+            if debtor_days > 0.0:
+                trade_receivables = round((debtor_days / 365.0) * sales, 2)
+
         # Calculate quantitative compliance:
         # NOTE: PRD specifies max(other_income, interest_income) / sales.
         # Screener.in's P&L row labeled "Interest" is Interest Expense (Finance Cost),
@@ -349,8 +395,9 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                 row = conn.execute("SELECT fundamentals_json FROM fundamentals_cache WHERE symbol = ?", (symbol,)).fetchone()
                 if row:
                     cached = json.loads(row[0])
-                    cached["source"] = "DB_CACHE_FALLBACK"
-                    return cached
+                    if cached.get("sector_name"):
+                        cached["source"] = "DB_CACHE_FALLBACK"
+                        return cached
         except Exception as db_err:
             logger.error(f"DB Cache fallback failed: {db_err}")
             

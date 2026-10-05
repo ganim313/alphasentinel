@@ -40,7 +40,7 @@ def check_and_execute_triggers() -> int:
     macro_data = {}
     with get_read_connection() as conn:
         rows = conn.execute("""
-            SELECT id, symbol, trigger_price, pattern_type, sector, market_cap_tier, circuit_band, adtv_20d
+            SELECT id, symbol, trigger_price, pattern_type, sector, market_cap_tier, circuit_band, adtv_20d, created_at
             FROM screener_candidates
             WHERE status = 'AWAITING_TRIGGER'
               AND scan_date >= (CURRENT_DATE - INTERVAL '5 days')
@@ -83,9 +83,11 @@ def check_and_execute_triggers() -> int:
         logger.warning(f"Error fetching live prices in trigger watcher: {e}")
         return 0
 
+    import pandas as pd
     for row in rows:
         cand_id, sym, trigger_p, pattern, sector, mcap_tier, cb = row[:7]
         cand_adtv = float(row[7]) if len(row) > 7 and row[7] is not None and float(row[7]) > 0 else 5000000.0
+        cand_created_at = row[8] if len(row) > 8 else None
         try:
             col = f"{sym}.NS"
             if len(symbols) == 1:
@@ -97,6 +99,21 @@ def check_and_execute_triggers() -> int:
 
             if close_series is None or close_series.empty or high_series is None or high_series.empty:
                 continue
+
+            if isinstance(high_series.index, pd.DatetimeIndex) and cand_created_at is not None:
+                try:
+                    cand_ts = pd.Timestamp(cand_created_at)
+                    idx_tz = high_series.index.tz
+                    if idx_tz is not None:
+                        cand_ts = cand_ts.tz_localize(IST).tz_convert(idx_tz) if cand_ts.tzinfo is None else cand_ts.tz_convert(idx_tz)
+                    elif cand_ts.tzinfo is not None:
+                        cand_ts = cand_ts.tz_convert(IST).tz_localize(None)
+                    cutoff_ts = cand_ts - pd.Timedelta(minutes=5)
+                    high_series = high_series[high_series.index >= cutoff_ts]
+                    if high_series.empty:
+                        continue
+                except Exception:
+                    pass
 
             current_p = float(close_series.iloc[-1])
             high_p = float(high_series.max())

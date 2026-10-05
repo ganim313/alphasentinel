@@ -125,6 +125,7 @@ def evaluate_minervini_vcp_batch(
         sma_50 = close_df.rolling(50, min_periods=50).mean()
         sma_150 = close_df.rolling(150, min_periods=150).mean()
         sma_200 = close_df.rolling(200, min_periods=150).mean()
+        sma_200_lookback = close_df.rolling(200, min_periods=130).mean()
         
         trend_period = MINERVINI_CONFIG.get("trend_dma_period", 21)
         
@@ -162,8 +163,11 @@ def evaluate_minervini_vcp_batch(
             if len(sma_150[sym].dropna()) == 0 or len(sma_200_valid) == 0:
                 continue # Must have sufficient 200-SMA history (min_periods=150)
                 
-            lookback_idx = -min(20, len(sma_200_valid))
-            sma_200_prev = sma_200_valid.iloc[lookback_idx]
+            if len(sma_200_valid) >= 20:
+                sma_200_prev = sma_200_valid.iloc[-20]
+            else:
+                lb_valid = sma_200_lookback[sym].dropna()
+                sma_200_prev = lb_valid.iloc[-min(20, len(lb_valid))]
             sma_200_curr = sma_200_valid.iloc[-1]
             if pd.isna(sma_200_prev) or pd.isna(sma_200_curr):
                 continue

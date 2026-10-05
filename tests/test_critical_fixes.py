@@ -552,6 +552,57 @@ def test_screener_scraper_sector_extraction_balance_sheet_and_etf_pledge_guard()
             funds2 = fetch_screener_fundamentals(sym_co)
         assert pytest.approx(funds2["pledge_trend_3m"], rel=1e-6) == 3.5
 
+        # Verify stale fundamentals_cache row with empty sector_name is bypassed and re-scraped via Other Assets schedule JSON
+        with get_write_connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO fundamentals_cache (symbol, fundamentals_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                (sym_co, '{"symbol": "TEST_SCRAPE_SEC", "sector_name": "", "inventories": 0.0, "trade_receivables": 0.0}')
+            )
+
+        html_co_schedule = """
+        <html><body>
+            <div id="company-info" data-company-id="1273698" data-consolidated="true"></div>
+            <ul id="top-ratios">
+                <li><span class="name">Stock P/E</span><span class="number">24.0</span></li>
+                <li><span class="name">Market Cap</span><span class="number">4,200</span></li>
+                <li><span class="name">ROCE</span><span class="number">21.0</span></li>
+                <li><span class="name">Debt to equity</span><span class="number">0.10</span></li>
+                <li><span class="name">Pledged percentage</span><span class="number">6.0</span></li>
+            </ul>
+            <section id="peers">
+                <p class="sub">
+                    <a href="/market/IN02/" title="Broad Sector">Consumer Discretionary</a>
+                    <a href="/market/IN02/IN0206/" title="Sector">Consumer Services</a>
+                </p>
+            </section>
+            <section id="profit-loss"><table><tr><td>Sales</td><td>1200</td></tr></table></section>
+            <section id="balance-sheet"><table><tr><td>Fixed Assets+</td><td>290</td></tr><tr><td>Other Assets+</td><td>444</td></tr><tr><td>Total Assets</td><td>757</td></tr></table></section>
+        </body></html>
+        """
+        resp_co_sched_page = MagicMock(status_code=200, text=html_co_schedule)
+        resp_co_sched_json = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "Inventories": {"Mar 2025": "578", "Mar 2026": "249"},
+                "Trade receivables": {
+                    "Mar 2025": "797",
+                    "Mar 2026": "94",
+                    "isExpandable": 'Company.showSchedule("Trade receivables", "balance-sheet", this)'
+                }
+            }
+        )
+
+        with patch("src.ingestion.screener_scraper.time.sleep"), \
+             patch("requests.get", side_effect=[resp_co_sched_page, resp_co_sched_json]), \
+             patch("yfinance.Ticker"):
+            funds_sched = fetch_screener_fundamentals(sym_co)
+
+        assert funds_sched["source"] == "SCREENER_LIVE"
+        assert funds_sched["sector_name"] == "Consumer Services"
+        assert funds_sched["inventories"] == 249.0
+        assert funds_sched["trade_receivables"] == 94.0
+        assert funds_sched["accounts_receivable"] == 94.0
+
         # Scrape ETF with empty ratios: must NOT insert into promoter_pledge_history
         with patch("src.ingestion.screener_scraper.time.sleep"), \
              patch("requests.get", return_value=resp_etf), \
@@ -637,8 +688,8 @@ def test_live_preview_rejects_mean_reversion_when_live_tick_drops_below_sma200()
 def test_trigger_watcher_chronological_atr_intraday_max_high_and_arbiter_targets():
     """
     Verify check_and_execute_triggers computes Wilder's ATR on chronologically ascending bhavcopy rows,
-    detects breakouts via high_series.max() across intraday 5m bars, passes DB macro_weather and
-    candidate adtv_20d to Arbiter, and uses Arbiter's stop_loss_price / target_1_price / target_2_price.
+    detects breakouts via high_series.max() across intraday 5m bars, ignores pre-creation morning highs,
+    passes DB macro_weather and candidate adtv_20d to Arbiter, and uses Arbiter's stop/target prices.
     """
     import pandas as pd
     from unittest.mock import patch
@@ -658,8 +709,8 @@ def test_trigger_watcher_chronological_atr_intraday_max_high_and_arbiter_targets
         conn.execute("""
             INSERT INTO screener_candidates (
                 id, scan_date, symbol, trigger_price, pattern_type, sector,
-                market_cap_tier, circuit_band, adtv_20d, status
-            ) VALUES (?, CURRENT_DATE, ?, 200.0, 'MINERVINI_VCP_STAGE2', 'Technology', 'MID', 20.0, 25000000.0, 'AWAITING_TRIGGER');
+                market_cap_tier, circuit_band, adtv_20d, status, created_at
+            ) VALUES (?, CURRENT_DATE, ?, 200.0, 'MINERVINI_VCP_STAGE2', 'Technology', 'MID', 20.0, 25000000.0, 'AWAITING_TRIGGER', TIMESTAMPTZ '2026-10-05 15:15:30+05:30');
         """, (cand_id, sym))
 
         # Early bars have wide range (20.0), recent bars have tight range (2.0) -> ASC vs DESC Wilder's ATR diverge sharply
@@ -683,11 +734,18 @@ def test_trigger_watcher_chronological_atr_intraday_max_high_and_arbiter_targets
     wrong_desc_atr = float(calc_atr(pd.Series(highs[::-1]), pd.Series(lows[::-1]), pd.Series(closes[::-1])).iloc[-1])
     assert abs(expected_chrono_atr - wrong_desc_atr) > 1.0
 
-    # Intraday 5m bars: earlier bar spiked to 201.5 (>= 200.0 trigger), latest bar High is 199.8, Close is 200.2
+    # Case 1: Morning bar (09:30 IST) spiked to 203.0 BEFORE candidate creation (15:15:30 IST), afternoon bars are 196.0 (< 200.0) -> must NOT trigger
+    morning_spike_idx = pd.to_datetime(["2026-10-05 09:30:00+05:30", "2026-10-05 15:15:00+05:30", "2026-10-05 15:20:00+05:30"])
+    mock_morning_only = pd.DataFrame({
+        "Close": [202.0, 195.5, 196.0],
+        "High": [203.0, 196.0, 196.5],
+    }, index=morning_spike_idx)
+
+    # Case 2: Post-creation bar (15:15 IST) spiked to 201.5 (>= 200.0 trigger), latest bar High is 199.8, Close is 200.2 -> MUST trigger
     mock_intraday = pd.DataFrame({
         "Close": [199.0, 201.0, 200.2],
         "High": [199.5, 201.5, 199.8],
-    })
+    }, index=morning_spike_idx)
 
     mock_arbiter_res = {
         "suggested_shares": 25,
@@ -697,6 +755,12 @@ def test_trigger_watcher_chronological_atr_intraday_max_high_and_arbiter_targets
     }
 
     try:
+        with patch("scripts.run_trigger_watcher.is_system_halted", return_value=False), \
+             patch("scripts.run_trigger_watcher.yf.download", return_value=mock_morning_only), \
+             patch("scripts.run_trigger_watcher.calculate_deterministic_risk_and_position", return_value=mock_arbiter_res) as mock_arb_early:
+            assert check_and_execute_triggers() == 0
+            mock_arb_early.assert_not_called()
+
         with patch("scripts.run_trigger_watcher.is_system_halted", return_value=False), \
              patch("scripts.run_trigger_watcher.yf.download", return_value=mock_intraday), \
              patch("scripts.run_trigger_watcher.calculate_deterministic_risk_and_position", return_value=mock_arbiter_res) as mock_arb, \
@@ -739,5 +803,3 @@ def test_settings_fallback_llm_1_and_scheduler_stdout_tail_on_success(caplog):
 
     assert ok is True
     assert "Final summary: 3 candidates approved" in caplog.text
-
-
