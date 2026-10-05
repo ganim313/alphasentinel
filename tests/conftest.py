@@ -31,6 +31,7 @@ def isolate_telegram_and_db_state(monkeypatch):
     saved_cb_df = None
     saved_sv_df = None
     saved_eq_df = None
+    saved_mw_df = None
 
     try:
         init_db()
@@ -40,6 +41,7 @@ def isolate_telegram_and_db_state(monkeypatch):
             saved_eq_df = conn.execute(
                 "SELECT * FROM equity_curve WHERE trade_date >= CURRENT_DATE - INTERVAL 1 DAY"
             ).df()
+            saved_mw_df = conn.execute("SELECT * FROM macro_weather").df()
     except Exception:
         pass
 
@@ -70,5 +72,12 @@ def isolate_telegram_and_db_state(monkeypatch):
                         conn.register("saved_eq_df", saved_eq_df)
                         conn.execute("INSERT OR REPLACE INTO equity_curve SELECT * FROM saved_eq_df")
                         conn.unregister("saved_eq_df")
+
+                if saved_mw_df is not None:
+                    conn.execute("DELETE FROM macro_weather")
+                    if not saved_mw_df.empty:
+                        conn.register("saved_mw_df", saved_mw_df)
+                        conn.execute("INSERT OR REPLACE INTO macro_weather SELECT * FROM saved_mw_df")
+                        conn.unregister("saved_mw_df")
     except Exception:
         pass

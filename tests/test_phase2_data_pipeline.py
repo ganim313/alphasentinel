@@ -211,7 +211,7 @@ def test_live_preview_falls_back_to_live_fetch_when_db_absent():
     """Verify run_live_preview falls back to live fetch when today's macro_weather is absent."""
     init_db()
     with get_write_connection() as conn:
-        conn.execute("DELETE FROM macro_weather WHERE scan_date = CURRENT_DATE;")
+        conn.execute("DELETE FROM macro_weather WHERE scan_date = CURRENT_DATE OR scan_date = DATE '2026-09-30';")
 
     mock_live = {
         "us_vix": 20.0, "sp500_pct_change": -0.2, "crude_oil_price": 75.0,
