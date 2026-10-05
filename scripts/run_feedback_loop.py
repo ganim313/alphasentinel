@@ -55,7 +55,8 @@ def evaluate_agent_learning_loop():
     try:
         from src.db.queue_writer import db_write
         import datetime
-        today = datetime.date.today().isoformat()
+        from zoneinfo import ZoneInfo
+        today = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
         db_write(
             "INSERT OR REPLACE INTO agent_memory "
             "(symbol, memory_date, pattern_type, previous_verdict, content, created_at) "

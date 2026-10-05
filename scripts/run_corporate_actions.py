@@ -8,7 +8,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import logging
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 import yfinance as yf
 from src.db.session import get_read_connection
 from src.ingestion.corporate_actions import record_corporate_action, apply_pending_corporate_actions
@@ -40,7 +41,7 @@ def fetch_and_record_splits():
                 "SELECT symbol FROM bhavcopy_daily GROUP BY symbol ORDER BY MAX(total_traded_val) DESC LIMIT 50"
             ).fetchall()]
         
-    cutoff_date = date.today() - timedelta(days=14)
+    cutoff_date = datetime.now(ZoneInfo("Asia/Kolkata")).date() - timedelta(days=14)
     logger.info(f"Checking splits for {len(symbols)} focused symbols...")
     
     for symbol in symbols:

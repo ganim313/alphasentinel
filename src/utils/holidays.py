@@ -46,7 +46,8 @@ HARDCODED_NSE_HOLIDAYS = [
 ]
 
 # Startup validation: Warn if operating in an unmapped calendar year
-_current_year = datetime.date.today().year
+from zoneinfo import ZoneInfo
+_current_year = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date().year
 _covered_years = {d.year for d in HARDCODED_NSE_HOLIDAYS}
 if _current_year not in _covered_years:
     logger.warning(

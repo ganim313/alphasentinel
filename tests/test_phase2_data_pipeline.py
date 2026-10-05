@@ -320,7 +320,8 @@ def test_monthly_peak_resets_on_calendar_month_boundary():
             );
         """)
 
-    state = get_portfolio_state()
+    with patch("src.portfolio.paper_capital.get_paper_capital", return_value=1000000.0):
+        state = get_portfolio_state()
     # Core equity is 1,000,000 + 150,000 = 1,150,000
     assert state["core_equity"] == 1150000.0
     # Because updated_at is August and current time is September+, monthly peak must reset to 1,150,000

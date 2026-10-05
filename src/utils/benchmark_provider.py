@@ -33,11 +33,16 @@ def get_benchmark_ohlc(lookback_days: int = 400) -> pd.DataFrame:
     Caches results in memory for 60 minutes.
     Raises RuntimeError loudly if yfinance returns insufficient data.
     """
-    now = datetime.datetime.now()
+    from zoneinfo import ZoneInfo
+    ist = ZoneInfo("Asia/Kolkata")
+    now = datetime.datetime.now(ist)
+    fetched_at = _cache["fetched_at"]
+    if fetched_at is not None and getattr(fetched_at, "tzinfo", None) is None:
+        fetched_at = fetched_at.replace(tzinfo=ist)
     if (
         _cache["ohlc"] is not None
-        and _cache["fetched_at"] is not None
-        and (now - _cache["fetched_at"]).total_seconds() < _CACHE_TTL_SECONDS
+        and fetched_at is not None
+        and (now - fetched_at).total_seconds() < _CACHE_TTL_SECONDS
         and len(_cache["ohlc"]) >= min(lookback_days, REGIME_DMA_PERIOD)
     ):
         return _cache["ohlc"]

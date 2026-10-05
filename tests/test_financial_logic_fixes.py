@@ -38,6 +38,7 @@ def test_eod_reconciliation_pnl_with_quantity():
     with mock.patch("scripts.run_eod_reconciliation.get_read_connection") as mock_get_conn, \
          mock.patch("scripts.run_eod_reconciliation.db_write") as mock_db_write, \
          mock.patch("scripts.run_eod_reconciliation.is_system_halted", return_value=False), \
+         mock.patch("src.notification.telegram_bot.send_telegram_alert"), \
          mock.patch("scripts.run_drawdown_check.check_drawdown"), \
          mock.patch("src.ingestion.bhavcopy.fetch_bhavcopy_with_retry_and_fallback", return_value=None), \
          mock.patch("src.ingestion.bhavcopy.ingest_bhavcopy_dataframe"):

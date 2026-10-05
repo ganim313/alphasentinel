@@ -65,7 +65,8 @@ def get_active_universe(conn, as_of_date: Optional[datetime.date] = None):
     Enforces 5-day active trading date window, positive volume filter,
     and excludes delisted stocks (with NULL safety).
     """
-    ref_date = as_of_date or datetime.date.today()
+    from zoneinfo import ZoneInfo
+    ref_date = as_of_date or datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
     return conn.execute("""
         SELECT b.symbol, MAX(b.series) as series, MAX(b.circuit_band_pct) as cb
         FROM bhavcopy_daily b
@@ -90,7 +91,8 @@ def run_live_preview_pipeline():
         return
 
     # 2. Market Day Check
-    today_ist = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30))).date()
+    from zoneinfo import ZoneInfo
+    today_ist = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
     if today_ist.weekday() >= 5:
         logger.info(f"Today is weekend ({today_ist.strftime('%A')}). Skipping run.")
         return

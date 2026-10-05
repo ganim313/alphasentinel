@@ -4,8 +4,8 @@ Orchestrates daily and periodic quantitative trading pipelines:
 - 08:30 AM IST (Mon-Fri): Pre-market Macro Radar & Corporate Actions
 - Every 15 min (09:15-15:30 IST, Mon-Fri): Real-Time Sentinel Trailing Stop & Risk Monitor
 - 03:15 PM IST (Mon-Fri): Live Screening & Debate Consensus Preview
-- 04:00 PM IST (Mon-Fri): EOD Reconciliation & Ingestion
-- 04:30 PM IST (Mon-Fri): Drawdown & Risk Offloader Check
+- 06:30 PM IST (Mon-Fri): EOD Reconciliation & Ingestion
+- 07:00 PM IST (Mon-Fri): Drawdown & Risk Offloader Check
 - Sunday 01:00 AM IST: Database Maintenance & Vacuum
 - 1st of Month 08:00 AM IST: Shariah Purification Report
 """

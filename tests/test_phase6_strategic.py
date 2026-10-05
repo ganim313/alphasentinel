@@ -303,10 +303,12 @@ def test_backup_upload_with_moto(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "B2_BUCKET_NAME", bucket_name)
     monkeypatch.setattr(settings, "B2_ENDPOINT_URL", "")
 
-    # Mock _get_s3_client to return the moto mock client
+    # Mock _get_s3_client to return the moto mock client and isolate BACKUP_DIR + Telegram
     monkeypatch.setattr(backup_mod, "_get_s3_client", lambda: s3_conn)
+    monkeypatch.setattr(backup_mod, "BACKUP_DIR", tmp_path / "backups")
 
-    backup_file = backup_mod.run_backup()
+    with patch("scripts.run_nightly_backup.send_telegram_alert"):
+        backup_file = backup_mod.run_backup()
     assert backup_file != ""
     assert backup_file.startswith("alphasentinel_")
 

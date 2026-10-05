@@ -136,6 +136,9 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
         )
 
         # 6. Monthly Peak Equity & Monthly Drawdown (Resets on new calendar month)
+        from zoneinfo import ZoneInfo
+        ist = ZoneInfo("Asia/Kolkata")
+        now = datetime.datetime.now(ist)
         stored_mpeak = initial_capital
         try:
             mpeak_res = db_conn.execute("""
@@ -144,15 +147,24 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
             if mpeak_res and mpeak_res[0] is not None and float(mpeak_res[0]) > 0:
                 mpeak_val = float(mpeak_res[0])
                 updated_at = mpeak_res[1]
-                now = datetime.datetime.now()
                 is_same_month = True
                 if updated_at is not None:
                     if hasattr(updated_at, "year") and hasattr(updated_at, "month"):
-                        if updated_at.year != now.year or updated_at.month != now.month:
+                        upd_dt = updated_at
+                        if getattr(upd_dt, "tzinfo", None) is not None:
+                            upd_dt = upd_dt.astimezone(ist)
+                        if upd_dt.year != now.year or upd_dt.month != now.month:
                             is_same_month = False
                     elif isinstance(updated_at, str):
-                        if not updated_at.startswith(now.strftime("%Y-%m")):
-                            is_same_month = False
+                        try:
+                            upd_dt = datetime.datetime.fromisoformat(updated_at)
+                            if upd_dt.tzinfo is not None:
+                                upd_dt = upd_dt.astimezone(ist)
+                            if upd_dt.year != now.year or upd_dt.month != now.month:
+                                is_same_month = False
+                        except ValueError:
+                            if not updated_at.startswith(now.strftime("%Y-%m")):
+                                is_same_month = False
                 
                 if is_same_month:
                     stored_mpeak = mpeak_val
@@ -212,7 +224,7 @@ def get_portfolio_state(conn=None) -> Dict[str, Any]:
             "monthly_peak_equity": round(monthly_peak, 2),
             "monthly_dd_pct": round(monthly_dd_pct, 4),
             "annualized_sharpe": round(annualized_sharpe, 4),
-            "as_of": datetime.datetime.now().isoformat(),
+            "as_of": now.isoformat(),
         }
 
     if conn is not None:

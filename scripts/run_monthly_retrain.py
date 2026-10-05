@@ -64,8 +64,10 @@ def check_model_age() -> tuple[bool, float]:
         logger.info(f"No model file found at {MODEL_PATH}. Retraining required.")
         return True, float("inf")
 
-    mtime = datetime.datetime.fromtimestamp(MODEL_PATH.stat().st_mtime)
-    age_days = (datetime.datetime.now() - mtime).total_seconds() / 86400
+    from zoneinfo import ZoneInfo
+    ist = ZoneInfo("Asia/Kolkata")
+    mtime = datetime.datetime.fromtimestamp(MODEL_PATH.stat().st_mtime, tz=ist)
+    age_days = (datetime.datetime.now(ist) - mtime).total_seconds() / 86400
     needs_retrain = age_days > MODEL_MAX_AGE_DAYS
 
     logger.info(
@@ -119,15 +121,23 @@ def read_last_trained_at() -> datetime.datetime | None:
     """
     Reads the 'trained_at' timestamp from the model metadata JSON.
     Returns None if the file doesn't exist or cannot be parsed.
+    Normalizes both naive and timezone-aware ISO timestamps to Asia/Kolkata.
     """
     if not META_PATH.exists():
         return None
     try:
+        from zoneinfo import ZoneInfo
+        ist = ZoneInfo("Asia/Kolkata")
         with open(META_PATH, "r") as f:
             meta = json.load(f)
         trained_at_str = meta.get("trained_at")
         if trained_at_str:
-            return datetime.datetime.fromisoformat(trained_at_str)
+            dt = datetime.datetime.fromisoformat(trained_at_str)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=ist)
+            else:
+                dt = dt.astimezone(ist)
+            return dt
     except Exception as e:
         logger.warning(f"Could not read model metadata from {META_PATH}: {e}")
     return None
@@ -141,9 +151,10 @@ def main() -> int:
         0 on success or intentional skip.
         1 on retraining failure.
     """
+    from zoneinfo import ZoneInfo
     logger.info("=" * 60)
     logger.info("AlphaSentinel Monthly Auto-Retraining Check")
-    logger.info(f"Timestamp: {datetime.datetime.now().isoformat()}")
+    logger.info(f"Timestamp: {datetime.datetime.now(ZoneInfo('Asia/Kolkata')).isoformat()}")
     logger.info("=" * 60)
 
     # --- Step 1: Model age check ---

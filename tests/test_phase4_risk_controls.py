@@ -569,9 +569,10 @@ def test_trigger_watcher_polls_and_executes_breakout():
         "High": [153.0]
     })
 
-    with patch("yfinance.download", return_value=mock_df):
-        with patch("src.notification.telegram_bot.send_telegram_alert"):
-            executed = check_and_execute_triggers()
+    with patch("yfinance.download", return_value=mock_df), \
+         patch("scripts.run_trigger_watcher.send_telegram_alert"), \
+         patch("src.notification.telegram_bot.send_telegram_alert"):
+        executed = check_and_execute_triggers()
 
     assert executed == 1
 

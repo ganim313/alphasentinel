@@ -201,7 +201,7 @@ def send_telegram_safe_halt_alarm(reason: str) -> bool:
 
 def send_telegram_morning_brief(macro_data: Dict[str, Any], top_movers: List[Any], watchlist: List[Any]) -> bool:
     """
-    Sends the 8:45 AM Pre-Market Brief to Telegram.
+    Sends the 08:30 AM IST Pre-Market Brief to Telegram.
     """
     if is_system_halted():
         logger.warning("System HALTED. Suppressing Morning Brief.")
@@ -221,7 +221,7 @@ def send_telegram_morning_brief(macro_data: Dict[str, Any], top_movers: List[Any
 
     text = f"""🌅 <b>MORNING BRIEF (Executive Synthesis)</b>
 ━━━━━━━━━━━━━━━━━━━━
-📊 <b>Macro Weather (8:45 AM)</b>
+📊 <b>Macro Weather (08:30 AM IST)</b>
 <b>Regime:</b> <code>{escape_html(macro_data.get('market_regime', 'N/A'))}</code>
 <b>US VIX:</b> <code>{float(macro_data.get('us_vix', 0) or 0):.2f}</code>
 <b>S&P 500:</b> <code>{float(macro_data.get('sp500_pct_change', 0) or 0):.2f}%</code>

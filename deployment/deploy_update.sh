@@ -54,8 +54,12 @@ info = get_paper_capital_info()
 print(f'  Paper capital: Rs.{info[\"capital\"]:,.0f} ({info[\"label\"]})')
 " 2>&1 | tee -a "$LOG_FILE"
 
-# 6. Restart services
-echo "[6/6] Restarting services..."
+# 6. Sync timezone & systemd unit files, then restart services
+echo "[6/6] Syncing timezone, systemd units & restarting services..."
+sudo timedatectl set-timezone Asia/Kolkata || true
+sudo cp deployment/alphasentinel-scheduler.service /etc/systemd/system/
+sudo cp deployment/alphasentinel-dashboard.service /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl restart alphasentinel-scheduler.service
 sudo systemctl restart alphasentinel-dashboard.service
 

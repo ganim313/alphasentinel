@@ -1,5 +1,5 @@
 """
-09:09 AM Pre-Market Macro Radar Runner.
+08:30 AM IST Pre-Market Macro Radar Runner.
 Fetches global indices, FII/DII data, and crude oil prices.
 Generates an Executive Morning Brief.
 """
@@ -27,7 +27,7 @@ def run_premarket_routine():
         logger.warning("System is currently HALTED by kill switch. Aborting pre-market routine.")
         return
 
-    logger.info("Executing 09:09 AM Pre-Market Macro Analysis...")
+    logger.info("Executing 08:30 AM IST Pre-Market Macro Analysis...")
     try:
         macro_data = fetch_macro_weather_data()
     except Exception as e:

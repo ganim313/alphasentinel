@@ -260,7 +260,8 @@ def test_conservative_auc_gate_aborts_sub_threshold():
     }, index=bench_dates)
 
     # When CV AUC evaluates to random noise (0.50), gate must abort and block serialization
-    with patch("scripts.run_model_training.roc_auc_score", return_value=0.50):
+    with patch("scripts.run_model_training.roc_auc_score", return_value=0.50), \
+         patch("scripts.run_model_training.register_strategy_trial", return_value=1):
         with pytest.raises(ValueError, match="Model validation gate failed"):
             train_global_model(raw_df=synthetic_raw_df, benchmark_df=synthetic_bench_df)
 
@@ -294,6 +295,7 @@ def test_conservative_auc_gate_passes_and_serializes_with_metadata(tmp_path):
     test_meta_path = tmp_path / "xgboost_global_meta.json"
 
     with patch("scripts.run_model_training.roc_auc_score", return_value=0.75), \
+         patch("scripts.run_model_training.register_strategy_trial", return_value=1), \
          patch("scripts.run_model_training.MODEL_PATH", test_model_path), \
          patch("scripts.run_model_training.META_PATH", test_meta_path):
         

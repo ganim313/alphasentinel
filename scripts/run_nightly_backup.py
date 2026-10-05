@@ -66,12 +66,15 @@ def _enforce_retention(s3_client, bucket: str, retention_days: int = 30) -> None
         logger.warning(f"Error enforcing retention policy: {e}")
 
 
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
 BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
 
 
 def _enforce_local_retention(backup_dir: Path, retention_days: int = 30) -> None:
     """Delete local backups older than retention_days."""
-    cutoff = datetime.datetime.now().timestamp() - (retention_days * 86400)
+    cutoff = datetime.datetime.now(IST).timestamp() - (retention_days * 86400)
     for p in backup_dir.glob("alphasentinel_*.duckdb"):
         try:
             if p.stat().st_mtime < cutoff:
@@ -87,7 +90,7 @@ def run_backup() -> str:
     Returns the backup filename.
     """
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(IST).strftime("%Y%m%d_%H%M%S")
     backup_filename = f"alphasentinel_{timestamp}.duckdb"
     dest_path = BACKUP_DIR / backup_filename
 

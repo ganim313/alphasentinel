@@ -151,7 +151,8 @@ def reset_paper_portfolio(new_capital: Optional[float] = None, label: str = "") 
         if capital_to_use < 10_000 or capital_to_use > 1_00_00_000:
             return False, "Capital out of range (₹10,000 – ₹1 Crore)."
 
-        today = datetime.date.today().isoformat()
+        from zoneinfo import ZoneInfo
+        today = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
         label = label.strip() or f"Paper Reset #{current_reset_count + 1} — ₹{capital_to_use:,.0f}"
 
         # 1. Close all open positions at entry price (zero P&L — fresh slate)

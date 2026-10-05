@@ -7,6 +7,7 @@
 set -e
 
 echo "=== [1/6] Updating System & Installing Prerequisites ==="
+sudo timedatectl set-timezone Asia/Kolkata || true
 sudo apt-get update -y
 sudo apt-get install -y python3-pip python3-venv git curl build-essential ufw
 

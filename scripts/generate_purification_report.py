@@ -41,10 +41,28 @@ def generate_monthly_report(year: int, month: int):
     print("="*60)
     print("Note: Purified amounts must be donated to charity without the intention of receiving spiritual reward for it.\\n")
 
+def resolve_report_year_month(
+    now: datetime.datetime | None = None,
+    argv: list[str] | None = None,
+) -> tuple[int, int]:
+    """
+    Resolves (year, month) for the Shariah purification report.
+    If explicit CLI arguments [script, year, month] are given, uses those.
+    Otherwise, when executed on the 1st of the month without explicit CLI year/month arguments,
+    reports on the previous completed calendar month.
+    """
+    from zoneinfo import ZoneInfo
+    if now is None:
+        now = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+    args = argv if argv is not None else sys.argv
+    if len(args) == 3:
+        return int(args[1]), int(args[2])
+    if now.day == 1:
+        prev_month = now.replace(day=1) - datetime.timedelta(days=1)
+        return prev_month.year, prev_month.month
+    return now.year, now.month
+
+
 if __name__ == "__main__":
-    now = datetime.datetime.now()
-    if len(sys.argv) == 3:
-        y, m = int(sys.argv[1]), int(sys.argv[2])
-    else:
-        y, m = now.year, now.month
+    y, m = resolve_report_year_month()
     generate_monthly_report(y, m)

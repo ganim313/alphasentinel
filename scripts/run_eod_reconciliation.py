@@ -1,5 +1,5 @@
 """
-06:00 PM EOD Reconciliation Pass.
+06:30 PM IST EOD Reconciliation Pass.
 Ingests official NSE Bhavcopy, calculates Delivery %, reconciles open/partially closed positions,
 executes 50% partial exits at Target 1 (3R) with Breakeven ratchets, Target 2 (6R) runner exits,
 and records Shariah purification logs on realized profitable trades.
@@ -52,7 +52,7 @@ def log_shariah_purification(trade_id: str, symbol: str, profit: float, conn=Non
         logger.debug(f"Could not load custom impure ratio for {symbol}: {e}. Defaulting to 5.0%.")
 
     purification_amt = round(profit * impure_ratio, 2)
-    pur_id = f"pur_{trade_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    pur_id = f"pur_{trade_id}_{datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%Y%m%d%H%M%S')}"
     
     try:
         db_write("""
@@ -69,7 +69,7 @@ def run_eod_reconciliation_pipeline():
     if is_system_halted():
         logger.warning("System is currently HALTED. Running EOD reconciliation in DEFENSIVE EXIT/RECONCILIATION mode.")
 
-    logger.info("Executing 06:00 PM EOD Reconciliation Pipeline...")
+    logger.info("Executing 06:30 PM IST EOD Reconciliation Pipeline...")
 
     # 0. Download & Ingest Official NSE Bhavcopy (Backfill missed days)
     from src.ingestion.bhavcopy import ingest_bhavcopy_dataframe, fetch_bhavcopy_with_retry_and_fallback

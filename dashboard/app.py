@@ -495,8 +495,9 @@ with tab1:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("Close Position Now", type="primary"):
                     from src.db.queue_writer import db_write
-                    from datetime import date
-                    now_str = date.today().isoformat()
+                    from datetime import datetime
+                    from zoneinfo import ZoneInfo
+                    now_str = datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat()
                     try:
                         db_write("""
                             UPDATE positions 
@@ -654,10 +655,10 @@ with tab4:
     col_log1, col_log2 = st.columns([3, 1])
     
     log_files = {
-        "03:15 PM Live Screener": "logs/live_preview.log",
-        "06:00 PM EOD DB Reconciliation": "logs/eod.log",
+        "03:15 PM IST Live Screener": "logs/live_preview.log",
+        "06:30 PM IST EOD DB Reconciliation": "logs/eod.log",
         "Intraday Trailing Stop Loss Sentinel": "logs/sentinel.log",
-        "09:09 AM Pre-Market Macro Radar": "logs/premarket.log"
+        "08:30 AM IST Pre-Market Macro Radar": "logs/premarket.log"
     }
     
     with col_log1:

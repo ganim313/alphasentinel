@@ -15,8 +15,9 @@ Design principles
 """
 
 import logging
-from datetime import date
+from datetime import datetime
 from typing import Tuple
+from zoneinfo import ZoneInfo
 
 from src.db.session import get_read_connection
 
@@ -56,7 +57,7 @@ def is_daily_drawdown_breached(threshold_pct: float = 3.0) -> Tuple[bool, str]:
       missing table never blocks trading.
     """
     try:
-        today = date.today()
+        today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
         with get_read_connection() as conn:
             # ----------------------------------------------------------------
             # 1. Day-open (starting) equity from equity_curve snapshot

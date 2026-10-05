@@ -11,6 +11,7 @@ from scripts.run_scheduler import setup_schedule
 
 
 def test_drawdown_check_runs_and_updates_state():
+    from unittest.mock import patch
     from src.db.session import get_read_connection
     init_db()
     with get_read_connection() as conn:
@@ -24,7 +25,10 @@ def test_drawdown_check_runs_and_updates_state():
             """)
         
         # Should run cleanly and update updated_at without BinderException
-        check_drawdown()
+        with patch("src.portfolio.paper_capital.get_paper_capital", return_value=1000000.0), \
+             patch("src.notification.telegram_bot.send_telegram_alert"), \
+             patch("src.notification.telegram_bot.send_telegram_safe_halt_alarm"):
+            check_drawdown()
 
         with get_write_connection() as conn:
             row = conn.execute("SELECT monthly_drawdown_pct, high_water_mark, updated_at FROM circuit_breaker_state WHERE id = 1").fetchone()
@@ -151,3 +155,156 @@ def test_eod_reconciliation_runner_trim_and_no_double_halving():
     with get_write_connection() as conn:
         conn.execute("DELETE FROM positions WHERE symbol = 'TEST_EOD'")
         conn.execute("DELETE FROM bhavcopy_daily WHERE symbol = 'TEST_EOD'")
+
+
+def test_purification_report_first_of_month_previous_month_resolution():
+    """
+    Verify that resolve_report_year_month defaults to the previous completed calendar month
+    when executed on the 1st of the month without explicit CLI year/month arguments.
+    """
+    from zoneinfo import ZoneInfo
+    from scripts.generate_purification_report import resolve_report_year_month
+
+    ist = ZoneInfo("Asia/Kolkata")
+
+    # 1. Executed on Oct 1, 2026 at 08:00 AM IST -> reports September 2026 (2026, 9)
+    oct_1 = datetime.datetime(2026, 10, 1, 8, 0, 0, tzinfo=ist)
+    assert resolve_report_year_month(now=oct_1, argv=["generate_purification_report.py"]) == (2026, 9)
+
+    # 2. Executed on Jan 1, 2027 at 08:00 AM IST -> reports December 2026 (2026, 12)
+    jan_1 = datetime.datetime(2027, 1, 1, 8, 0, 0, tzinfo=ist)
+    assert resolve_report_year_month(now=jan_1, argv=["generate_purification_report.py"]) == (2026, 12)
+
+    # 3. Executed mid-month on Oct 15, 2026 -> reports current month October 2026 (2026, 10)
+    oct_15 = datetime.datetime(2026, 10, 15, 12, 0, 0, tzinfo=ist)
+    assert resolve_report_year_month(now=oct_15, argv=["generate_purification_report.py"]) == (2026, 10)
+
+    # 4. Explicit CLI arguments override even on the 1st of the month
+    assert resolve_report_year_month(
+        now=oct_1, argv=["generate_purification_report.py", "2026", "5"]
+    ) == (2026, 5)
+
+
+def test_nightly_backup_filename_uses_ist_timezone(tmp_path, monkeypatch):
+    """
+    Verify that run_backup() formats the backup filename using Asia/Kolkata (IST)
+    rather than UTC when a UTC timestamp is converted.
+    """
+    from unittest.mock import patch
+    from zoneinfo import ZoneInfo
+    import duckdb
+    from src.config.settings import settings
+    import scripts.run_nightly_backup as backup_mod
+
+    test_db = tmp_path / "test_ist_backup.duckdb"
+    with duckdb.connect(str(test_db)) as con:
+        con.execute("CREATE TABLE t (x INT); INSERT INTO t VALUES (1);")
+
+    backup_dir = tmp_path / "backups"
+    monkeypatch.setattr(backup_mod, "DB_PATH", str(test_db))
+    monkeypatch.setattr(backup_mod, "BACKUP_DIR", backup_dir)
+    monkeypatch.setattr(settings, "B2_KEY_ID", "")
+    monkeypatch.setattr(settings, "B2_APPLICATION_KEY", "")
+
+    # 20:30 UTC on Oct 4 == 02:00 AM IST on Oct 5
+    fake_utc = datetime.datetime(2026, 10, 4, 20, 30, 0, tzinfo=datetime.timezone.utc)
+
+    class FakeDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is not None:
+                return fake_utc.astimezone(tz)
+            return fake_utc.replace(tzinfo=None)
+
+    with patch("scripts.run_nightly_backup.datetime.datetime", FakeDatetime), \
+         patch("scripts.run_nightly_backup.send_telegram_alert"):
+        filename = backup_mod.run_backup()
+
+    # Must reflect 2026-10-05 02:00:00 IST, NOT 2026-10-04 20:30:00 UTC
+    assert filename == "alphasentinel_20261005_020000.duckdb"
+    assert (backup_dir / filename).exists()
+
+
+def test_monthly_retrain_read_last_trained_at_naive_and_aware(tmp_path, monkeypatch):
+    """
+    Verify read_last_trained_at() normalizes both naive and aware ISO timestamps
+    to Asia/Kolkata (IST) cleanly without TypeError.
+    """
+    import json
+    from zoneinfo import ZoneInfo
+    import scripts.run_monthly_retrain as retrain_mod
+
+    ist = ZoneInfo("Asia/Kolkata")
+    meta_file = tmp_path / "xgboost_global_meta.json"
+    monkeypatch.setattr(retrain_mod, "META_PATH", meta_file)
+
+    # 1. Naive ISO timestamp
+    meta_file.write_text(json.dumps({"trained_at": "2026-09-15T10:30:00"}), encoding="utf-8")
+    dt_naive = retrain_mod.read_last_trained_at()
+    assert dt_naive is not None
+    assert dt_naive.tzinfo == ist
+    assert dt_naive.hour == 10 and dt_naive.minute == 30
+
+    # 2. UTC-aware ISO timestamp (05:00 UTC == 10:30 IST)
+    meta_file.write_text(json.dumps({"trained_at": "2026-09-15T05:00:00+00:00"}), encoding="utf-8")
+    dt_aware = retrain_mod.read_last_trained_at()
+    assert dt_aware is not None
+    assert dt_aware.tzinfo == ist
+    assert dt_aware.hour == 10 and dt_aware.minute == 30
+
+
+def test_portfolio_state_ist_month_boundary_with_utc_timestamp():
+    """
+    Verify get_portfolio_state converts timezone-aware updated_at to IST before
+    evaluating whether updated_at is in the same calendar month.
+    Example: 2026-09-30 20:00:00 UTC is 2026-10-01 01:30:00 IST (October in IST).
+    """
+    from unittest.mock import patch
+    from zoneinfo import ZoneInfo
+    import duckdb
+    from src.portfolio.state import get_portfolio_state
+
+    ist = ZoneInfo("Asia/Kolkata")
+    mem_conn = duckdb.connect(":memory:")
+    mem_conn.execute("""
+        CREATE TABLE positions (
+            id VARCHAR PRIMARY KEY,
+            symbol VARCHAR,
+            current_ltp DOUBLE,
+            entry_price DOUBLE,
+            quantity INTEGER,
+            status VARCHAR,
+            realized_pnl DOUBLE,
+            unrealized_pnl DOUBLE,
+            exit_date DATE
+        );
+        CREATE TABLE circuit_breaker_state (
+            id INTEGER PRIMARY KEY,
+            high_water_mark DOUBLE,
+            monthly_peak_equity DOUBLE,
+            updated_at VARCHAR
+        );
+        INSERT INTO circuit_breaker_state VALUES (
+            1, 1200000.0, 1200000.0, '2026-09-30T20:00:00+00:00'
+        );
+    """)
+
+    fake_oct = datetime.datetime(2026, 10, 5, 12, 0, 0, tzinfo=ist)
+
+    class FakeDatetime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz is not None:
+                return fake_oct.astimezone(tz)
+            return fake_oct
+
+    with patch("src.portfolio.state.datetime.datetime", FakeDatetime), \
+         patch("src.portfolio.paper_capital.get_paper_capital", return_value=1000000.0):
+        state = get_portfolio_state(conn=mem_conn)
+
+    # Because 2026-09-30T20:00:00+00:00 is 2026-10-01 01:30 IST (same month as Oct 5 IST),
+    # monthly_peak_equity should remain 1,200,000.0 rather than resetting!
+    assert state["monthly_peak_equity"] == 1200000.0
+    assert state["as_of"].endswith("+05:30")
+
+

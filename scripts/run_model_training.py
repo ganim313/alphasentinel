@@ -411,8 +411,9 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
     except Exception:
         git_commit = "unknown"
 
+    from zoneinfo import ZoneInfo
     meta_data = {
-        "trained_at": datetime.datetime.now().isoformat(),
+        "trained_at": datetime.datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
         "row_count": len(clean_df),
         "auc_mean": round(mean_auc, 4),
         "auc_std": round(std_auc, 4),

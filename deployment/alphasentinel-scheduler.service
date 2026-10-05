@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/alphasentinel
+Environment="TZ=Asia/Kolkata"
 ExecStart=/home/ubuntu/alphasentinel/venv/bin/python scripts/run_scheduler.py
 Restart=always
 RestartSec=30
