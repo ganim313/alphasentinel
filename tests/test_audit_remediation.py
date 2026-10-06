@@ -342,7 +342,8 @@ def test_fix6_eod_reconciliation_equity_curve_core_equity_consistency():
 # Fix 9: Conviction Threshold 7.0 & Judge Prompt + Agent Memory Verdict
 # ---------------------------------------------------------------------------
 def test_fix9_conviction_threshold_and_judge_memory_verdict():
-    with open("src/config/strategy.yaml", "r", encoding="utf-8") as f:
+    from src.config.settings import PROJECT_ROOT
+    with open(PROJECT_ROOT / "src" / "config" / "strategy.yaml", "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     assert float(cfg["risk"]["min_conviction_score"]) == 7.0
 
@@ -1086,10 +1087,10 @@ def test_item5_backtest_shariah_filtering_and_dhan_broker_rest_routing():
 # Remaining Audit Item 6: Shariah Trading Invariants Rule File Persisted
 # ---------------------------------------------------------------------------
 def test_item6_shariah_trading_invariants_rule_file_persisted():
-    from pathlib import Path
+    from src.config.settings import PROJECT_ROOT
 
-    rule_path = Path(".gemini/rules/shariah_trading_invariants.md")
-    assert rule_path.exists(), "Missing .gemini/rules/shariah_trading_invariants.md"
+    rule_path = PROJECT_ROOT / ".gemini" / "rules" / "shariah_trading_invariants.md"
+    assert rule_path.exists(), f"Missing {rule_path}"
     content = rule_path.read_text(encoding="utf-8")
     for required_phrase in [
         "33%",

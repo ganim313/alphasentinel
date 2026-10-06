@@ -37,3 +37,5 @@ logs/
 repomix-output.xml
 user_inputs.txt
 .gemini/
+!.gemini/rules/
+!.gemini/rules/**
