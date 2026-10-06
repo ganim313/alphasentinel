@@ -133,8 +133,8 @@ def evaluate_minervini_vcp_batch(
         high_252d = high_df.tail(252).max()
         low_252d = low_df.tail(252).min()
         
-        low_mult = MINERVINI_CONFIG.get("52w_low_multiplier", 1.25)
-        high_mult = MINERVINI_CONFIG.get("52w_high_multiplier", 0.75)
+        low_mult = MINERVINI_CONFIG.get("60d_low_multiplier", MINERVINI_CONFIG.get("52w_low_multiplier", 1.25))
+        high_mult = MINERVINI_CONFIG.get("60d_high_multiplier", MINERVINI_CONFIG.get("52w_high_multiplier", 0.75))
         vol_dryup_mult = VCP_CONFIG.get("volume_dryup_multiplier", 0.85)
         
         vol_20d = vol_df.tail(20).mean()
@@ -207,8 +207,32 @@ def evaluate_minervini_vcp_batch(
             if volatility_30d <= 0:
                 continue
             volatility_contraction = volatility_10d < (volatility_30d * 0.75)
-            
-            if not volatility_contraction:
+
+            # High-Low Contraction Depth Check (c1..c4 using true intraday high_df and low_df, including c2)
+            sym_high = high_df[sym].dropna()
+            sym_low = low_df[sym].dropna()
+            if len(sym_high) < 40 or len(sym_low) < 40:
+                continue
+
+            def _hl_depth(h_slice: pd.Series, l_slice: pd.Series) -> float:
+                if len(h_slice) == 0 or len(l_slice) == 0:
+                    return 0.0
+                h_max = float(h_slice.max())
+                l_min = float(l_slice.min())
+                return (h_max - l_min) / h_max if h_max > 0 else 0.0
+
+            c1_depth = _hl_depth(sym_high.iloc[-40:-20], sym_low.iloc[-40:-20])
+            c2_depth = _hl_depth(sym_high.iloc[-20:-10], sym_low.iloc[-20:-10])
+            c3_depth = _hl_depth(sym_high.iloc[-10:-5], sym_low.iloc[-10:-5])
+            c4_depth = _hl_depth(sym_high.iloc[-5:], sym_low.iloc[-5:])
+            hl_contraction = (
+                c2_depth <= c1_depth * 1.05
+                and c3_depth <= c2_depth * 1.05
+                and c4_depth <= c3_depth * 1.05
+                and c4_depth <= c1_depth
+            )
+
+            if not (volatility_contraction and hl_contraction):
                 continue
             
             # Relative Strength Calculation vs Benchmark
@@ -235,8 +259,8 @@ def evaluate_minervini_vcp_batch(
             sym_df = df[df['symbol'] == sym]
             delivery_latest = float(sym_df["delivery_pct"].iloc[-1]) if not sym_df.empty and "delivery_pct" in sym_df.columns and pd.notna(sym_df["delivery_pct"].iloc[-1]) else 0.0
             
-            # Authentic Minervini Consolidation Base Pivot High
-            pivot_price = float(close_df[sym].tail(20).max())
+            # Authentic Minervini Consolidation Base Pivot High (from intraday high_df, not close_df)
+            pivot_price = float(high_df[sym].tail(20).max())
             trigger_price = round(pivot_price, 2)
             
             results.append({

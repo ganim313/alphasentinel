@@ -36,3 +36,4 @@ logs/
 # Repo dumps & temporary files
 repomix-output.xml
 user_inputs.txt
+.gemini/

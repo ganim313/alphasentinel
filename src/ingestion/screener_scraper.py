@@ -84,6 +84,9 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         "cwip": 0.0,
         "inventories": 0.0,
         "intangible_assets": 0.0,
+        "investments": 0.0,
+        "cash_equivalents": 0.0,
+        "cash_to_assets": 0.0,
         "trade_receivables": 0.0,
         "accounts_receivable": 0.0,
         "interest_income_ratio": 0.0,
@@ -91,6 +94,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         "illiquid_ratio": 0.0,
         "other_liabilities": 0.0,
         "net_liquid_assets_crores": 0.0,
+        "sales_growth_pct": 0.0,
+        "profit_growth_pct": 0.0,
         "is_shariah_compliant": False,
         "source": "FALLBACK_IMPUTED"
     }
@@ -154,7 +159,7 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                 txt = el.get_text(strip=True)
                 if txt and txt.lower() not in ("customize", "edit", "peers", "more") and txt not in sector_candidates:
                     sector_candidates.append(txt)
-            if sector_candidates:
+            if sel == '#peers a' and sector_candidates:
                 break
 
         if sector_candidates:
@@ -165,12 +170,19 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             else:
                 sector_name = sector_candidates[0]
 
-            # If a sub-industry breadcrumb contains a Shariah-prohibited keyword, preserve it in sector_name
+            # If a sub-industry breadcrumb contains a Shariah-prohibited keyword (including plurals like Distilleries/Breweries), preserve it in sector_name
             try:
+                import re
                 from src.screening.shariah_filter import PROHIBITED_SECTORS
                 for cand_txt in sector_candidates:
                     cand_low = cand_txt.lower()
-                    if any(p in cand_low for p in PROHIBITED_SECTORS) and cand_txt not in sector_name:
+                    matched_prohibited = False
+                    for p in PROHIBITED_SECTORS:
+                        pattern = rf'\b{p[:-1]}(?:y|ies)\b' if p.endswith("y") else rf'\b{p}(?:s|es)?\b'
+                        if re.search(pattern, cand_low):
+                            matched_prohibited = True
+                            break
+                    if matched_prohibited and cand_txt not in sector_name:
                         sector_name = f"{sector_name} - {cand_txt}" if sector_name else cand_txt
                         break
             except Exception:
@@ -191,10 +203,42 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                         return 0.0
             return 0.0
 
+        def get_row_growth_pct(section_id: str, row_names: tuple) -> Optional[float]:
+            section = soup.find('section', id=section_id)
+            if not section:
+                return None
+            for tr in section.find_all('tr'):
+                tds = tr.find_all('td')
+                if len(tds) < 3:
+                    continue
+                label = tds[0].get_text(strip=True).lower()
+                if any(rn in label for rn in row_names):
+                    nums = []
+                    for td in tds[1:]:
+                        txt_val = td.get_text(strip=True).replace(',', '').replace('%', '')
+                        try:
+                            nums.append(float(txt_val))
+                        except ValueError:
+                            continue
+                    if len(nums) >= 2 and abs(nums[-2]) > 0:
+                        return round(((nums[-1] - nums[-2]) / abs(nums[-2])) * 100.0, 2)
+            return None
+
         # Extract strict quantitative Shariah metrics
         sales = get_row_last_val('profit-loss', 'sales')
         if sales <= 0.0:
             sales = get_row_last_val('profit-loss', 'revenue')
+
+        sales_growth_pct = (
+            get_row_growth_pct('quarters', ('sales', 'revenue'))
+            or get_row_growth_pct('profit-loss', ('sales', 'revenue'))
+            or ratios.get("sales growth", 0.0)
+        )
+        profit_growth_pct = (
+            get_row_growth_pct('quarters', ('net profit', 'operating profit', 'profit before tax'))
+            or get_row_growth_pct('profit-loss', ('net profit', 'operating profit', 'profit before tax'))
+            or ratios.get("profit growth", 0.0)
+        )
 
         other_income = get_row_last_val('profit-loss', 'other income')
         # CRITICAL BUG FIX: P&L "Interest" is Interest Expense (Finance Cost), NOT Interest Income. Removed fallback.
@@ -210,6 +254,16 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         if inventories <= 0.0:
             inventories = get_row_last_val('balance-sheet', 'inventory')
         intangible_assets = get_row_last_val('balance-sheet', 'intangible assets')
+        investments = get_row_last_val('balance-sheet', 'investments')
+        cash_equivalents = get_row_last_val('balance-sheet', 'cash equivalents')
+        if cash_equivalents <= 0.0:
+            cash_equivalents = get_row_last_val('balance-sheet', 'cash & bank')
+        if cash_equivalents <= 0.0:
+            cash_equivalents = get_row_last_val('balance-sheet', 'cash and bank')
+        if cash_equivalents <= 0.0:
+            cash_equivalents = get_row_last_val('balance-sheet', 'cash')
+        if cash_equivalents <= 0.0:
+            cash_equivalents = get_row_last_val('balance-sheet', 'bank')
         other_liabilities = get_row_last_val('balance-sheet', 'other liabilities')
         trade_receivables = get_row_last_val('balance-sheet', 'trade receivables')
         if trade_receivables <= 0.0:
@@ -217,8 +271,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         if trade_receivables <= 0.0:
             trade_receivables = get_row_last_val('balance-sheet', 'receivables')
 
-        # Screener.in nests Inventories and Trade receivables inside the 'Other Assets' schedule JSON
-        if inventories <= 0.0 or trade_receivables <= 0.0:
+        # Screener.in nests Inventories, Trade receivables, and Cash Equivalents inside the 'Other Assets' schedule JSON
+        if inventories <= 0.0 or trade_receivables <= 0.0 or cash_equivalents <= 0.0:
             company_info_el = soup.find("div", id="company-info")
             company_id = company_info_el.get("data-company-id") if company_info_el else None
             if company_id:
@@ -247,12 +301,21 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                                         continue
                                 return 0.0
 
+                            sched_cash = 0.0
+                            found_sched_cash = False
                             for k_name, row_dict in sched_data.items():
                                 k_low = str(k_name).lower()
                                 if inventories <= 0.0 and ("inventor" in k_low):
                                     inventories = _last_sched_num(row_dict)
                                 elif trade_receivables <= 0.0 and ("receivable" in k_low or "debtor" in k_low):
                                     trade_receivables = _last_sched_num(row_dict)
+                                elif ("cash" in k_low or "bank" in k_low):
+                                    sched_cash += _last_sched_num(row_dict)
+                                    found_sched_cash = True
+                                elif investments <= 0.0 and ("invest" in k_low):
+                                    investments = _last_sched_num(row_dict)
+                            if cash_equivalents <= 0.0 and found_sched_cash:
+                                cash_equivalents = sched_cash
                 except Exception as sched_err:
                     logger.debug(f"Could not fetch Other Assets schedule for {symbol}: {sched_err}")
 
@@ -263,12 +326,15 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                 trade_receivables = round((debtor_days / 365.0) * sales, 2)
 
         # Calculate quantitative compliance:
-        # NOTE: PRD specifies max(other_income, interest_income) / sales.
+        # NOTE: PRD specifies max(other_income, interest_income) / sales (or other_income / sales),
+        # while the canonical Halal Stock 2.0 workbook divides Other Income by Total Revenue (sales + other_income).
         # Screener.in's P&L row labeled "Interest" is Interest Expense (Finance Cost),
         # NOT Interest Income. Using it as income would UNDERSTATE impure income ratio.
         # other_income is retained as a conservative proxy (fail-safe direction for Shariah compliance).
-        interest_income_ratio = (other_income / sales) if sales > 0 else 0.0
+        total_revenue = sales + max(0.0, other_income)
+        interest_income_ratio = (other_income / total_revenue) if (total_revenue > 0 and sales > 0) else 0.0
         debt_to_assets = (borrowings / total_assets) if total_assets > 0 else 0.0
+        cash_to_assets = ((cash_equivalents + investments) / total_assets) if total_assets > 0 else 0.0
         
         # Updated Illiquid Asset Formula matching Excel (Fixed + CWIP + Inventory + Intangible)
         total_illiquid = fixed_assets + cwip + inventories + intangible_assets
@@ -299,6 +365,21 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"Failed to fetch yfinance news for {symbol}: {e}")
 
+        # Fallback to instrument_master.sector if sector_name is still empty
+        if not sector_name:
+            try:
+                from src.db.session import get_read_connection
+                from src.screening.shariah_filter import infer_sector_from_company_or_symbol
+                with get_read_connection() as conn:
+                    im_row = conn.execute(
+                        "SELECT sector FROM instrument_master WHERE symbol = ?",
+                        (symbol,)
+                    ).fetchone()
+                    if im_row and im_row[0] and str(im_row[0]).strip():
+                        sector_name = str(im_row[0]).strip()
+            except Exception:
+                pass
+
         # Calculate pledge trend using history from prior dates (before inserting today's row)
         pledge_trend_3m = 0.0
         try:
@@ -322,8 +403,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
                         (symbol,)
                     ).fetchone()
                 if row and row[0] is not None:
-                    pledge_3m_ago = float(row[0])
-                    pledge_trend_3m = pledged - pledge_3m_ago
+                     pledge_3m_ago = float(row[0])
+                     pledge_trend_3m = pledged - pledge_3m_ago
         except Exception as e:
             logger.warning(f"Failed to fetch pledge history for {symbol}: {e}")
 
@@ -360,6 +441,9 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             "cwip": cwip,
             "inventories": inventories,
             "intangible_assets": intangible_assets,
+            "investments": investments,
+            "cash_equivalents": cash_equivalents,
+            "cash_to_assets": cash_to_assets,
             "trade_receivables": trade_receivables,
             "accounts_receivable": trade_receivables,
             "interest_income_ratio": interest_income_ratio,
@@ -367,6 +451,8 @@ def fetch_screener_fundamentals(symbol: str) -> Dict[str, Any]:
             "illiquid_ratio": illiquid_ratio,
             "other_liabilities": other_liabilities,
             "net_liquid_assets_crores": net_liquid_assets,
+            "sales_growth_pct": float(sales_growth_pct or 0.0),
+            "profit_growth_pct": float(profit_growth_pct or 0.0),
             "source": "SCREENER_LIVE"
         }
         

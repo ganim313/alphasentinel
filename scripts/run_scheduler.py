@@ -250,6 +250,13 @@ def job_monthly_hmm_refit():
             fit_and_save_hmm()
 
 
+def job_monthly_retrain():
+    now_ist = datetime.datetime.now(IST)
+    if now_ist.day == 1:
+        logger.info("Triggering 1st of Month Global XGBoost Model Retraining (run_monthly_retrain.py)...")
+        run_script("run_monthly_retrain.py", timeout_seconds=1800)
+
+
 def setup_schedule(include_symbol_sync: bool = True):
     tz = "Asia/Kolkata"
 
@@ -292,6 +299,9 @@ def setup_schedule(include_symbol_sync: bool = True):
 
     # 11. Daily 00:30 AM IST check for 1st of Month: HMM Regime Refit
     schedule.every().day.at("00:30", tz).do(job_monthly_hmm_refit).tag("monthly_hmm_refit")
+
+    # 12. Daily 01:30 AM IST check for 1st of Month: Global XGBoost Model Retraining
+    schedule.every().day.at("01:30", tz).do(job_monthly_retrain).tag("monthly_retrain")
 
 
 def main():

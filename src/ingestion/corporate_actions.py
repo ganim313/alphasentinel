@@ -37,12 +37,11 @@ def record_corporate_action(
             multiplier = min(ratio_from, ratio_to) / max(ratio_from, ratio_to)
         else:
             multiplier = 1.0
-    elif act == "REVERSE_SPLIT":
-        multiplier = max(ratio_from, ratio_to) / min(ratio_from, ratio_to) if min(ratio_from, ratio_to) > 0 else 1.0
+    elif act in ("REVERSE_SPLIT", "REV_SPLIT"):
         multiplier = max(ratio_from, ratio_to) / min(ratio_from, ratio_to) if min(ratio_from, ratio_to) > 0 else 1.0
     elif act == "BONUS":
         total_shares = ratio_from + ratio_to
-        multiplier = (min(ratio_from, ratio_to) / total_shares) if total_shares > 0 else 1.0
+        multiplier = (ratio_to / total_shares) if total_shares > 0 else 1.0
     elif act == "RIGHTS":
         multiplier = (ratio_from / ratio_to) if ratio_to > 0 else 1.0
     else:

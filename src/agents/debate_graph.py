@@ -77,18 +77,36 @@ def deterministic_risk_node(state: AgentState) -> Dict[str, Any]:
     )
     
     verdict = risk_result.get("verdict", "REJECT")
-    
+    suggested_shares = risk_result.get("suggested_shares", 0)
+    total_capital_deployed = risk_result.get("total_capital_deployed", 0.0)
+    portfolio_allocation_pct = risk_result.get("portfolio_allocation_pct", 0.0)
+    rejection_reason = risk_result.get("rejection_reason", "")
+
+    corr_scalar = float(corr_metrics.get("degraded_sizing_scalar", 1.0)) if isinstance(corr_metrics, dict) else 1.0
+    if verdict == "APPROVE" and corr_scalar < 1.0 and suggested_shares > 0:
+        import math
+        suggested_shares = math.floor(suggested_shares * corr_scalar)
+        if suggested_shares <= 0:
+            verdict = "REJECT"
+            total_capital_deployed = 0.0
+            portfolio_allocation_pct = 0.0
+            rejection_reason = f"Position size reduced to 0 after correlation degraded scalar ({corr_scalar})."
+        else:
+            total_capital_deployed = round(suggested_shares * trigger, 2)
+            portfolio_allocation_pct = round((total_capital_deployed / settings.ALGO_ALLOCATED_CAPITAL) * 100, 2)
+            logger.info(f"[{symbol}] Applied degraded correlation scalar {corr_scalar}: {suggested_shares} shares")
+
     return {
         "risk_verdict": verdict,
-        "suggested_shares": risk_result.get("suggested_shares", 0),
+        "suggested_shares": suggested_shares,
         "stop_loss_price": risk_result.get("stop_loss_price", 0.0),
         "target_1_price": risk_result.get("target_1_price", 0.0),
         "target_2_price": risk_result.get("target_2_price", 0.0),
         "risk_reward_ratio": risk_result.get("risk_reward_ratio", 0.0),
-        "total_capital_deployed": risk_result.get("total_capital_deployed", 0.0),
-        "portfolio_allocation_pct": risk_result.get("portfolio_allocation_pct", 0.0),
-        "rejection_reason": risk_result.get("rejection_reason", ""),
-        "messages": [AIMessage(content=f"Deterministic Risk Arbiter: {verdict}. Reason: {risk_result.get('rejection_reason')}")]
+        "total_capital_deployed": total_capital_deployed,
+        "portfolio_allocation_pct": portfolio_allocation_pct,
+        "rejection_reason": rejection_reason,
+        "messages": [AIMessage(content=f"Deterministic Risk Arbiter: {verdict}. Reason: {rejection_reason}")]
     }
 
 
@@ -256,6 +274,7 @@ def research_judge_node(state: AgentState) -> Dict[str, Any]:
     else:
         pattern_guidance = ""
 
+    pledged_val = fundamentals.get('promoter_pledged_pct', fundamentals.get('pledged_pct', 'N/A'))
     prompt = f"""You are the Chief Quantitative Research Judge.
 Evaluate the Bull Thesis and Bear Critique for {symbol} impartially against ground-truth quantitative data.
 
@@ -264,7 +283,7 @@ GROUND-TRUTH QUANTITATIVE DATA:
 - Trigger Price: ₹{trigger} | Stop Loss: ₹{stop_loss} | Target 1: ₹{target_1}
 - 20-Day ADTV: ₹{adtv:,.0f} | Circuit Band: {circuit_band}%
 - Profit Growth: {fundamentals.get('profit_growth_pct', 'N/A')}% | Sales Growth: {fundamentals.get('sales_growth_pct', 'N/A')}%
-- Debt / Assets: {fundamentals.get('debt_to_assets', 'N/A')} | Promoter Pledge: {fundamentals.get('pledged_pct', 'N/A')}%
+- Debt / Assets: {fundamentals.get('debt_to_assets', 'N/A')} | Promoter Pledge: {pledged_val}%
 {pattern_guidance}
 BULL THESIS:
 {bull}
@@ -304,8 +323,26 @@ CONVICTION_SCORE: [e.g. 7.5]"""
     try:
         from src.db.queue_writer import db_write
         import json
+        import yaml
+        from pathlib import Path
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        threshold = 7.0
+        try:
+            _config_path = Path(__file__).resolve().parent.parent / "config" / "strategy.yaml"
+            with open(_config_path, "r", encoding="utf-8") as _f:
+                _cfg = yaml.safe_load(_f)
+            threshold = float(_cfg.get("risk", {}).get("min_conviction_score", 7.0))
+        except Exception:
+            threshold = 7.0
+
+        if conviction < threshold:
+            effective_verdict = "REJECT"
+            effective_reason = f"Conviction score {conviction}/10 below minimum threshold {threshold}/10"
+        else:
+            effective_verdict = state.get("risk_verdict", "APPROVE")
+            effective_reason = state.get("rejection_reason", "")
         
         today_date = datetime.now(ZoneInfo('Asia/Kolkata')).date()
         memory_content = json.dumps({
@@ -328,8 +365,8 @@ CONVICTION_SCORE: [e.g. 7.5]"""
             symbol,
             today_date,
             state.get("pattern_type") or pattern,
-            state.get("risk_verdict", "APPROVE"),
-            state.get("rejection_reason", ""),
+            effective_verdict,
+            effective_reason,
             state.get("bear_risks", ""),
             conviction,
             conviction,
@@ -348,7 +385,7 @@ CONVICTION_SCORE: [e.g. 7.5]"""
 def conviction_gate_node(state: AgentState) -> Dict[str, Any]:
     """
     Conviction Score Gate: Hard minimum threshold enforced AFTER research judge.
-    Reads min_conviction_score from src/config/strategy.yaml (default: 6.5).
+    Reads min_conviction_score from src/config/strategy.yaml (default: 7.0).
     Rejects the trade if the conviction score falls below the configured threshold.
     LLM cost has already been spent; this node prevents low-confidence orders from leaking
     through to order execution.
@@ -356,21 +393,30 @@ def conviction_gate_node(state: AgentState) -> Dict[str, Any]:
     symbol = state.get("symbol", "UNKNOWN")
     score = state.get("conviction_score", 5.0)
 
-    # Load threshold from strategy.yaml; fall back to 6.5 if unavailable
-    threshold = 6.5
+    # Load threshold from strategy.yaml; fall back to 7.0 if unavailable
+    threshold = 7.0
     try:
         import yaml
         from pathlib import Path
         _config_path = Path(__file__).resolve().parent.parent / "config" / "strategy.yaml"
         with open(_config_path, "r", encoding="utf-8") as _f:
             _cfg = yaml.safe_load(_f)
-        threshold = float(_cfg.get("risk", {}).get("min_conviction_score", 6.5))
+        threshold = float(_cfg.get("risk", {}).get("min_conviction_score", 7.0))
     except Exception as _e:
-        logger.warning(f"[{symbol}] Could not load min_conviction_score from strategy.yaml: {_e}. Using default 6.5.")
+        logger.warning(f"[{symbol}] Could not load min_conviction_score from strategy.yaml: {_e}. Using default 7.0.")
 
     if score < threshold:
         reason = f"Conviction score {score}/10 below minimum threshold {threshold}/10"
         logger.warning(f"[{symbol}] Conviction Gate REJECT: {reason}")
+        try:
+            from src.db.queue_writer import db_write
+            db_write("""
+                UPDATE agent_memory
+                SET previous_verdict = 'REJECT', rejection_reason = ?
+                WHERE symbol = ? AND memory_date = CURRENT_DATE;
+            """, (reason, symbol))
+        except Exception:
+            pass
         return {
             "risk_verdict": "REJECT",
             "rejection_reason": reason,

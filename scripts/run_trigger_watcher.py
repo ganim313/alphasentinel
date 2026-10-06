@@ -118,8 +118,8 @@ def check_and_execute_triggers() -> int:
             current_p = float(close_series.iloc[-1])
             high_p = float(high_series.max())
 
-            if high_p >= trigger_p:
-                logger.info(f"🎯 [{sym}] TRIGGER HIT! High ₹{high_p:.2f} >= Trigger ₹{trigger_p:.2f}")
+            if current_p >= trigger_p and high_p >= trigger_p:
+                logger.info(f"🎯 [{sym}] TRIGGER HIT! Current ₹{current_p:.2f} (High ₹{high_p:.2f}) >= Trigger ₹{trigger_p:.2f}")
                 
                 # Fetch recent ATR and sort chronologically (ascending by trade_date)
                 with get_read_connection() as conn:

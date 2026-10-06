@@ -12,12 +12,44 @@ from src.db.session import get_read_connection
 logger = logging.getLogger(__name__)
 
 
+def compute_sector_median_pe_map(conn=None) -> Dict[str, float]:
+    """
+    Computes cross-sectional median P/E per sector from fundamentals_cache.
+    """
+    import json
+    sector_pes: Dict[str, list] = {}
+
+    def _collect(c):
+        rows = c.execute("SELECT fundamentals_json FROM fundamentals_cache").fetchall()
+        for (f_json,) in rows:
+            try:
+                data = json.loads(f_json) if isinstance(f_json, str) else (f_json or {})
+                sec = str(data.get("sector_name") or "").strip()
+                pe = float(data.get("pe_ratio") or 0.0)
+                if sec and pe > 0.0:
+                    sector_pes.setdefault(sec, []).append(pe)
+            except Exception:
+                continue
+
+    try:
+        if conn is not None:
+            _collect(conn)
+        else:
+            with get_read_connection() as read_conn:
+                _collect(read_conn)
+    except Exception as e:
+        logger.warning(f"Failed to compute sector median P/E map: {e}")
+
+    return {sec: round(float(np.median(vals)), 2) for sec, vals in sector_pes.items() if vals}
+
+
 def evaluate_anti_trap_shield(
     symbol: str, 
     candidate: Dict[str, Any], 
     fundamentals: Dict[str, Any],
     live_price: float = None,
-    live_volume: int = None
+    live_volume: int = None,
+    sector_median_pe: float = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Executes the 6-layer pre-flight anti-trap checks.
@@ -125,10 +157,32 @@ def evaluate_anti_trap_shield(
         }
 
     # -------------------------------------------------------------
-    # Layer 5: P/E Overvaluation Filter (DISABLED for short swing trading)
+    # Layer 5: P/E Overvaluation Filter (Cross-Sectional Sector Median P/E)
     # -------------------------------------------------------------
-    # Value investing metrics are irrelevant for momentum swings. 
-    # We care about technical price action and Shariah debt logic, not P/E multiples.
+    eff_sector_median_pe = sector_median_pe
+    if eff_sector_median_pe is None:
+        eff_sector_median_pe = fundamentals.get("sector_median_pe")
+    if eff_sector_median_pe is None:
+        sec = str(fundamentals.get("sector_name") or fundamentals.get("sector") or "").strip()
+        if sec:
+            try:
+                pe_map = compute_sector_median_pe_map()
+                eff_sector_median_pe = pe_map.get(sec)
+            except Exception:
+                pass
+    pe_ratio = fundamentals.get("pe_ratio")
+    if (
+        eff_sector_median_pe is not None
+        and float(eff_sector_median_pe) > 0.0
+        and pe_ratio is not None
+        and float(pe_ratio) > 0.0
+    ):
+        if float(pe_ratio) > 2.5 * float(eff_sector_median_pe):
+            return False, "TRAP_L5_PE_OVERVALUATION", {
+                "pe_ratio": float(pe_ratio),
+                "sector_median_pe": float(eff_sector_median_pe),
+                "rule": "Stock P/E exceeds 2.5x cross-sectional sector median P/E."
+            }
 
     # -------------------------------------------------------------
     # Layer 6: FOMO Saturation (News Headline Volume + Price Confirmation)

@@ -116,7 +116,7 @@ def run_eod_reconciliation_pipeline():
                    p.entry_date, b.trade_date
             FROM positions p
             JOIN bhavcopy_daily b ON p.symbol = b.symbol
-            WHERE p.status IN ('OPEN', 'TARGET_1_TRIMMED') 
+            WHERE p.status IN ('OPEN', 'TARGET_1_TRIMMED', 'MARKED_FOR_CLOSURE') 
               AND b.trade_date = (SELECT MAX(trade_date) FROM bhavcopy_daily) 
               AND b.trade_date >= p.entry_date;
         """).fetchall()
@@ -198,6 +198,22 @@ def run_eod_reconciliation_pipeline():
         elif upper_c is not None and (ltp >= upper_c or high_p >= upper_c):
             if ltp >= upper_c:
                 logger.info(f"🔒 CIRCUIT LOCK: {symbol} is locked at UPPER circuit (LTP: {ltp}). Order book frozen. Holding position.")
+
+        # Case 0: Execute pending closure for MARKED_FOR_CLOSURE positions once no longer circuit-locked
+        if pos_status == 'MARKED_FOR_CLOSURE':
+            actual_exit = open_p if open_p is not None else ltp
+            exit_pnl = round((actual_exit - entry_p) * (quantity if quantity is not None else 1), 2)
+            total_realized_pnl = round(prior_realized_pnl + exit_pnl, 2)
+            db_write("""
+                UPDATE positions 
+                SET status = 'CLOSED', exit_price = ?, exit_date = CURRENT_DATE,
+                    realized_pnl = ?, current_ltp = ?, unrealized_pnl = 0.0
+                WHERE id = ?;
+            """, (actual_exit, total_realized_pnl, ltp, pos_id))
+            logger.info(f"Position {symbol} (MARKED_FOR_CLOSURE) liquidated at ₹{actual_exit:.2f} | Realized PnL: ₹{total_realized_pnl:.2f}")
+            if exit_pnl > 0:
+                log_shariah_purification(pos_id, symbol, exit_pnl)
+            continue
 
         # Case A: Stop Loss Hit (Pessimistic Fill Enforced for Data Integrity)
         # Skip stop loss check on entry day (entry at 3:15 PM was not subjected to morning low)
@@ -353,7 +369,7 @@ def run_eod_reconciliation_pipeline():
         unrealized_pnl = round((ltp - entry_p) * (quantity if quantity is not None else 1), 2)
         risk_pct = ((ltp - entry_p) / entry_p) * 100
         
-        if risk_pct <= -5.0 or (lower_c is not None and ltp <= lower_c):
+        if risk_pct <= -5.5 or (lower_c is not None and ltp <= lower_c):
             logger.warning(f"CRITICAL OFFLOAD: Position {symbol} exhibits excessive risk ({risk_pct:.2f}%) or is near lower circuit. Marking for EOD closure.")
             db_write("""
                 UPDATE positions SET status = 'MARKED_FOR_CLOSURE', current_ltp = ?, unrealized_pnl = ? WHERE id = ?;
@@ -439,7 +455,7 @@ def run_eod_reconciliation_pipeline():
             INSERT OR REPLACE INTO equity_curve (
                 trade_date, total_equity, core_equity, unrealized_pnl
             ) VALUES (CURRENT_DATE, ?, ?, ?);
-        """, (total_eq, core_eq - unrealized, unrealized))
+        """, (total_eq, core_eq, unrealized))
         logger.info(f"📊 Daily equity_curve recorded: Total ₹{total_eq:,.2f} | Unrealized ₹{unrealized:,.2f}")
     except Exception as eq_err:
         logger.warning(f"Failed to record daily equity_curve row: {eq_err}")

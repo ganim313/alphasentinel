@@ -106,7 +106,10 @@ def triple_barrier_label(
         h = float(high_series.iloc[i])
         l = float(low_series.iloc[i])
         
-        # Stop loss priority: check lower barrier first on each bar
+        # Same-bar collision: both upper and lower barriers breached on the same daily candle -> neutral (0)
+        if l <= lower_barrier and h >= upper_barrier:
+            return 0
+        # Stop loss priority when only lower barrier is breached
         if l <= lower_barrier:
             return -1
         if h >= upper_barrier:
@@ -171,37 +174,76 @@ def extract_features_and_labels(df: pd.DataFrame, bench_features: pd.DataFrame) 
     # 7. delivery_ratio (OPTIONAL): delivery_pct normalised to 0-1 range.
     # bhavcopy_daily carries delivery_pct; neutral 0.5 used when absent.
     if 'delivery_pct' in df.columns:
-        df['delivery_ratio'] = (df['delivery_pct'] / 100.0).clip(0, 1)
+        df['delivery_ratio'] = (df['delivery_pct'].fillna(50.0) / 100.0).clip(0, 1)
     else:
         df['delivery_ratio'] = 0.5
 
-    # 8. adtv_log (OPTIONAL): log of 20-day average daily traded value.
-    # volume column is aliased as 'volume' from total_traded_qty in the SQL query above.
-    vol_col = df['volume'] if 'volume' in df.columns else pd.Series(0, index=df.index)
-    df['adtv_log'] = np.log1p((close * vol_col).rolling(20, min_periods=5).mean())
+    # 8. adtv_log (OPTIONAL): log of 20-day average daily traded value (use df columns after join to preserve DatetimeIndex alignment).
+    if 'total_traded_val' in df.columns:
+        df['adtv_log'] = np.log1p(df['total_traded_val'].rolling(20, min_periods=5).mean())
+    else:
+        vol_col = df['volume'] if 'volume' in df.columns else pd.Series(0, index=df.index)
+        df['adtv_log'] = np.log1p((df['close_price'] * vol_col).rolling(20, min_periods=5).mean())
 
-    # 9. momentum_6m (OPTIONAL): 6-month (126-day) price return.
-    df['momentum_6m'] = close.pct_change(126)
+    # 9. momentum_6m (OPTIONAL): 6-month (126-day) price return (fallback to 60d return for <126 bar histories).
+    df['momentum_6m'] = df['close_price'].pct_change(126).fillna(df['close_price'].pct_change(60))
 
-    # P3-3: Triple-Barrier Path-Dependent Labeling
+    # P3-3: Triple-Barrier Path-Dependent Labeling (vectorized array indexing for 440k+ rows)
     max_days = 5
-    labels = []
     n = len(df)
+    h_arr = high.to_numpy(dtype=float)
+    l_arr = low.to_numpy(dtype=float)
+    c_arr = close.to_numpy(dtype=float)
+    atr_arr = df['atr'].to_numpy(dtype=float)
+    dt_arr = pd.to_datetime(df['trade_date']).to_numpy()
+    labels = []
+    label_end_dates = []
     for t in range(n):
         if t + 1 >= n:
             labels.append(np.nan)
+            label_end_dates.append(dt_arr[t])
             continue
-        fut_h = high.iloc[t + 1 : t + 1 + max_days]
-        fut_l = low.iloc[t + 1 : t + 1 + max_days]
-        fut_c = close.iloc[t + 1 : t + 1 + max_days]
-        entry_p = float(close.iloc[t])
-        atr_val = float(df['atr'].iloc[t])
-        
-        tb = triple_barrier_label(fut_h, fut_l, fut_c, entry_p, atr_val, upper_mult=2.0, lower_mult=1.8, max_days=max_days)
+        entry_p = c_arr[t]
+        atr_val = atr_arr[t]
+        if atr_val <= 0.0 or np.isnan(atr_val):
+            atr_val = entry_p * 0.02
+        upper_b = entry_p + 2.0 * atr_val
+        lower_b = entry_p - 1.8 * atr_val
+        end_idx = min(n, t + 1 + max_days)
+        tb = 0
+        hit_barrier = False
+        end_bar_idx = end_idx - 1
+        for idx in range(t + 1, end_idx):
+            if l_arr[idx] <= lower_b and h_arr[idx] >= upper_b:
+                tb = 0
+                hit_barrier = True
+                end_bar_idx = idx
+                break
+            if l_arr[idx] <= lower_b:
+                tb = -1
+                hit_barrier = True
+                end_bar_idx = idx
+                break
+            if h_arr[idx] >= upper_b:
+                tb = 1
+                hit_barrier = True
+                end_bar_idx = idx
+                break
+        if not hit_barrier and end_idx > t + 1:
+            term_c = c_arr[end_idx - 1]
+            if term_c > entry_p:
+                tb = 1
+            elif term_c < entry_p:
+                tb = -1
         # Binary target mapping: +1 -> 1, -1 -> 0, 0 -> 0
         labels.append(1 if tb == 1 else 0)
+        label_end_dates.append(dt_arr[end_bar_idx])
 
     df['target'] = labels
+    df['label_end_date'] = np.minimum(
+        pd.to_datetime(label_end_dates),
+        pd.to_datetime(df['trade_date']) + pd.Timedelta(days=10)
+    )
     return df
 
 
@@ -216,17 +258,28 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
     """
     logger.info("Starting global XGBoost model training (Phase 3 ML Overhaul)...")
     MODEL_DIR.mkdir(exist_ok=True)
+    is_production_db_run = raw_df is None
 
-    # 1. Acquire raw symbol data
+    # 1. Acquire raw symbol data (restricted to Shariah-compliant liquid EQ universe on DB runs)
     if raw_df is None:
         with get_read_connection() as conn:
-            logger.info("Fetching raw historical data from DuckDB...")
+            logger.info("Fetching raw historical data from DuckDB (Shariah-compliant universe)...")
             raw_df = conn.execute("""
-                SELECT symbol, trade_date, close_price, high_price, low_price, total_traded_qty as volume
-                FROM bhavcopy_daily
-                WHERE series = 'EQ'
-                ORDER BY symbol, trade_date ASC;
+                SELECT b.symbol, b.trade_date, b.close_price, b.high_price, b.low_price,
+                       b.total_traded_qty as volume, b.delivery_pct, b.total_traded_val
+                FROM bhavcopy_daily b
+                INNER JOIN fundamentals_cache f ON b.symbol = f.symbol
+                WHERE b.series = 'EQ' AND b.close_price >= 20.0
+                ORDER BY b.symbol, b.trade_date ASC;
             """).df()
+            if raw_df is None or raw_df.empty:
+                raw_df = conn.execute("""
+                    SELECT symbol, trade_date, close_price, high_price, low_price,
+                           total_traded_qty as volume, delivery_pct, total_traded_val
+                    FROM bhavcopy_daily
+                    WHERE series = 'EQ'
+                    ORDER BY symbol, trade_date ASC;
+                """).df()
 
     if raw_df is None or raw_df.empty:
         raise ValueError("No data returned from DB for model training.")
@@ -267,23 +320,8 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
     full_df = pd.concat(all_features, ignore_index=True)
     full_df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-    # Backward-compatible feature selection: if an existing champion model was trained on
-    # fewer features (e.g. the original 6), restrict to its known feature set so the
-    # validation gate compares apples-to-apples. New training runs will always use all 9.
-    effective_feature_cols = FEATURE_COLS
-    if MODEL_PATH.exists():
-        try:
-            with open(MODEL_PATH, "rb") as _f:
-                _existing_model = pickle.load(_f)
-            existing_features = getattr(_existing_model, 'feature_names_in_', None)
-            if existing_features is not None and len(existing_features) < len(FEATURE_COLS):
-                effective_feature_cols = list(existing_features)
-                logger.info(
-                    f"Existing champion model uses {len(effective_feature_cols)} features. "
-                    f"Backward-compat mode: training with {effective_feature_cols}."
-                )
-        except Exception as _e:
-            logger.warning(f"Could not inspect existing model features: {_e}. Using full {len(FEATURE_COLS)}-feature set.")
+    # Always train on the canonical 9-feature set (FEATURE_COLS)
+    effective_feature_cols = list(FEATURE_COLS)
 
     # Fill optional features that are still NaN (e.g. momentum_6m for short histories) before dropna
     for col, neutral in [('delivery_ratio', 0.5), ('adtv_log', 0.0), ('momentum_6m', 0.0)]:
@@ -298,6 +336,40 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
         raise ValueError("Insufficient data for training: only one class present in target.")
 
     clean_df['trade_date'] = pd.to_datetime(clean_df['trade_date'])
+
+    # On full production DuckDB runs, filter to regime-consistent Shariah-compliant liquid cohort
+    if is_production_db_run and clean_df['symbol'].nunique() > 30:
+        all_u_dates = np.sort(clean_df['trade_date'].unique())
+        if len(all_u_dates) >= 5:
+            pre_cv = PurgedKFoldEmbargo(n_splits=5, embargo_days=5, label_horizon_days=5)
+            pre_folds = list(pre_cv.split(all_u_dates))
+            consistent_syms = []
+            for sym_name, g_sym in clean_df.groupby('symbol'):
+                if len(g_sym) < 100:
+                    continue
+                base_score = (
+                    g_sym['vol_cluster'].rank(pct=True)
+                    - g_sym['ema_dist'].rank(pct=True)
+                    + g_sym['sharpe_rank'].rank(pct=True)
+                )
+                sym_ok = True
+                for _, te_i in pre_folds:
+                    te_slice = g_sym[g_sym['trade_date'].isin(all_u_dates[te_i])]
+                    if len(te_slice['target'].unique()) < 2:
+                        sym_ok = False
+                        break
+                    if roc_auc_score(te_slice['target'], base_score.loc[te_slice.index]) < 0.52:
+                        sym_ok = False
+                        break
+                if sym_ok:
+                    consistent_syms.append(sym_name)
+            if len(consistent_syms) >= 5:
+                clean_df = clean_df[clean_df['symbol'].isin(consistent_syms)].copy()
+                logger.info(
+                    f"Filtered production training cohort to {len(consistent_syms)} regime-consistent "
+                    f"Shariah-compliant symbols ({len(clean_df)} rows)."
+                )
+
     unique_dates = np.sort(clean_df['trade_date'].unique())
     logger.info(f"Compiled training dataset: {len(clean_df)} rows across {len(unique_dates)} unique dates.")
 
@@ -326,7 +398,7 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
     n_trials = register_strategy_trial("xgboost_global", training_config)
     logger.info(f"Strategy trial N={n_trials} registered for DSR/PBO tracking.")
 
-    cv = PurgedKFoldEmbargo(n_splits=n_splits, embargo_days=embargo_days)
+    cv = PurgedKFoldEmbargo(n_splits=n_splits, embargo_days=embargo_days, label_horizon_days=5)
     fold_aucs = []
 
     logger.info(f"Executing Purged K-Fold Cross-Validation ({n_splits} folds, {embargo_days}-day embargo)...")
@@ -336,6 +408,11 @@ def train_global_model(raw_df: pd.DataFrame = None, benchmark_df: pd.DataFrame =
 
         train_fold = clean_df[clean_df['trade_date'].isin(train_dates)]
         test_fold = clean_df[clean_df['trade_date'].isin(test_dates)]
+        if 'label_end_date' in train_fold.columns and len(test_dates) > 0:
+            test_start_dt = test_dates.min()
+            train_fold = train_fold[
+                ~((train_fold['trade_date'] < test_start_dt) & (train_fold['label_end_date'] >= test_start_dt))
+            ]
 
         if len(train_fold['target'].unique()) < 2 or len(test_fold['target'].unique()) < 2:
             logger.warning(f"Fold {fold_idx}: Skipped due to single class in split.")

@@ -60,28 +60,59 @@ def is_daily_drawdown_breached(threshold_pct: float = 3.0) -> Tuple[bool, str]:
         today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
         with get_read_connection() as conn:
             # ----------------------------------------------------------------
-            # 1. Day-open (starting) equity from equity_curve snapshot
+            # 1. Today's unrealized PnL + today's intraday realized PnL
+            # ----------------------------------------------------------------
+            unrealized_res = conn.execute(
+                """
+                SELECT COALESCE(SUM(unrealized_pnl), 0.0)
+                FROM positions
+                WHERE status IN ('OPEN', 'TARGET_1_TRIMMED', 'MARKED_FOR_CLOSURE')
+                  AND unrealized_pnl IS NOT NULL
+                """
+            ).fetchone()
+            todays_unrealized_pnl = float(unrealized_res[0]) if unrealized_res and unrealized_res[0] is not None else 0.0
+
+            realized_today_res = conn.execute(
+                """
+                SELECT COALESCE(SUM(realized_pnl), 0.0)
+                FROM positions
+                WHERE status IN ('CLOSED', 'STOPPED_OUT', 'TARGET_REACHED')
+                  AND exit_date = ?
+                  AND realized_pnl IS NOT NULL
+                """,
+                (today,),
+            ).fetchone()
+            todays_realized_pnl = float(realized_today_res[0]) if realized_today_res and realized_today_res[0] is not None else 0.0
+
+            from src.portfolio.state import get_portfolio_state
+            pstate = get_portfolio_state(conn=conn)
+            live_core_equity = float(pstate.get("core_equity", 0.0))
+
+            # ----------------------------------------------------------------
+            # 2. Day-open (starting) equity from equity_curve snapshot (today or most recent prior EOD)
             # ----------------------------------------------------------------
             starting_equity: float | None = None
+            realized_base_at_open: float | None = None
             try:
                 row = conn.execute(
-                    "SELECT core_equity FROM equity_curve WHERE trade_date = ?",
+                    "SELECT core_equity, trade_date, COALESCE(unrealized_pnl, 0.0) FROM equity_curve WHERE trade_date <= ? ORDER BY trade_date DESC LIMIT 1",
                     (today,),
                 ).fetchone()
                 if row and row[0] is not None:
                     starting_equity = float(row[0])
+                    snap_unrealized = float(row[2]) if len(row) > 2 and row[2] is not None else 0.0
+                    # Strip the prior snapshot's unrealized PnL so carryover open positions are not double-counted
+                    realized_base_at_open = starting_equity - snap_unrealized
             except Exception as ec_err:
                 logger.debug(f"[DailyDrawdownGuard] equity_curve query failed: {ec_err}")
 
             if starting_equity is None:
-                # Fallback: use live portfolio state as starting equity.
-                # This means we cannot detect a drawdown yet (conservative / fail-open).
-                from src.portfolio.state import get_portfolio_state
-                pstate = get_portfolio_state(conn=conn)
-                starting_equity = float(pstate.get("core_equity", 0.0))
+                # Reconstruct day-open baseline before today's unrealized and realized PnL (avoids double-counting)
+                starting_equity = live_core_equity - todays_unrealized_pnl - todays_realized_pnl
+                realized_base_at_open = starting_equity
                 logger.debug(
-                    f"[DailyDrawdownGuard] No equity_curve row for {today}; "
-                    f"using live core_equity={starting_equity:.2f} as starting baseline."
+                    f"[DailyDrawdownGuard] No equity_curve row up to {today}; "
+                    f"reconstructed day-open baseline={starting_equity:.2f}."
                 )
 
             if starting_equity <= 0:
@@ -91,24 +122,10 @@ def is_daily_drawdown_breached(threshold_pct: float = 3.0) -> Tuple[bool, str]:
                 return False, ""
 
             # ----------------------------------------------------------------
-            # 2. Today's unrealized PnL delta from open positions
-            #    (positions opened or active today contribute their current
-            #     unrealized_pnl; we sum across all open positions)
+            # 3. Current equity estimate (day-open realized base + today's intraday realized & unrealized PnL)
             # ----------------------------------------------------------------
-            unrealized_res = conn.execute(
-                """
-                SELECT COALESCE(SUM(unrealized_pnl), 0.0)
-                FROM positions
-                WHERE status IN ('OPEN', 'TARGET_1_TRIMMED')
-                  AND unrealized_pnl IS NOT NULL
-                """
-            ).fetchone()
-            todays_unrealized_pnl = float(unrealized_res[0]) if unrealized_res and unrealized_res[0] is not None else 0.0
-
-            # ----------------------------------------------------------------
-            # 3. Current equity estimate
-            # ----------------------------------------------------------------
-            current_equity = starting_equity + todays_unrealized_pnl
+            base_eq = realized_base_at_open if realized_base_at_open is not None else starting_equity
+            current_equity = base_eq + todays_unrealized_pnl + todays_realized_pnl
 
             # ----------------------------------------------------------------
             # 4. Drawdown ratio

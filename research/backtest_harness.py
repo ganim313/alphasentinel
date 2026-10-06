@@ -36,6 +36,9 @@ AlphaSentinel Research Backtest Harness
 import sys
 import argparse
 from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.append(str(Path(__file__).parent))
 
 import pandas as pd
@@ -47,6 +50,15 @@ from data_loader import load_data
 from algos.momentum import run_momentum
 from algos.mean_reversion import run_mean_reversion
 from algos.ml_factor import run_ml_factor
+from src.screening.shariah_filter import PROHIBITED_SYMBOLS
+
+
+def _filter_shariah_compliant_columns(cols: list) -> list:
+    """Exclude any prohibited Haram symbols (e.g., HDFCBANK, ICICIBANK, SBIN, ITC) from tradeable columns."""
+    return [
+        c for c in cols
+        if c != "^INDIAVIX" and str(c).upper().replace(".NS", "") not in PROHIBITED_SYMBOLS
+    ]
 
 # ── Task A: Indian Market Transaction Cost Model ───────────────────────────────
 # All rates are expressed as a fraction of trade value (not percentage).
@@ -154,7 +166,7 @@ def _apply_transaction_costs(port_returns: pd.Series,
     # Each trade costs half a round-trip (open or close).
     # We charge the full round-trip when a NEW position is opened because
     # we know a close will eventually happen — conservative but accurate.
-    num_stocks = len(stock_cols)
+    num_stocks = max(len(stock_cols), 1)
     cost_per_day = (trades_per_day / num_stocks) * (ROUND_TRIP_COST / 2)
 
     adjusted = port_returns - cost_per_day
@@ -217,9 +229,8 @@ def run_shootout():
         signals = signals.loc[out_of_sample_start:]
         dr      = daily_returns.loc[out_of_sample_start:]
 
-        # Calculate daily portfolio return (Equal weighted among active signals).
-        # We exclude VIX from returns calculation.
-        stock_cols = [c for c in signals.columns if c != '^INDIAVIX']
+        # Calculate daily portfolio return (Equal weighted among active Shariah-compliant signals).
+        stock_cols = _filter_shariah_compliant_columns(list(signals.columns))
         active_signals = signals[stock_cols]
         active_dr      = dr[stock_cols]
 
@@ -328,7 +339,7 @@ def run_walk_forward_backtest():
     }
 
     daily_returns = close_df.pct_change().shift(-1)
-    stock_cols    = [c for c in close_df.columns if c != '^INDIAVIX']
+    stock_cols    = _filter_shariah_compliant_columns(list(close_df.columns))
 
     # Build window boundaries.
     # Use monthly DateOffset so windows align to calendar months.

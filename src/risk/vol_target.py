@@ -71,6 +71,7 @@ def calculate_volatility_scalar(
     candidate_value: float,
     core_equity: float,
     cov_matrix: Optional[np.ndarray] = None,
+    fallback_scalar: float = 1.0,
 ) -> float:
     """
     Computes L_t in (0, 1] to scale down suggested_shares for the candidate.
@@ -81,9 +82,10 @@ def calculate_volatility_scalar(
         candidate_value:  Proposed position value = suggested_shares * entry_price
         core_equity:      Current portfolio equity from portfolio_state
         cov_matrix:       Optional precomputed covariance matrix (used in unit tests)
+        fallback_scalar:  Scalar returned when covariance data is insufficient (default 1.0)
 
     Returns:
-        1.0 if portfolio is under vol target or insufficient data.
+        fallback_scalar (default 1.0) if portfolio is under vol target or insufficient data.
         < 1.0 if portfolio would exceed sigma_target.
     """
     if core_equity <= 0 or candidate_value <= 0:
@@ -101,7 +103,7 @@ def calculate_volatility_scalar(
         cov_matrix = _fetch_covariance_matrix(symbols, settings.VOL_TARGET_LOOKBACK_DAYS)
 
     if cov_matrix is None or cov_matrix.shape != (len(symbols), len(symbols)):
-        return 1.0   # Insufficient data or shape mismatch -- fail open safely
+        return float(fallback_scalar)   # Insufficient data or shape mismatch
 
     # Weights aligned with sorted symbol order
     weights = np.array([proposed[s] / core_equity for s in symbols], dtype=float)

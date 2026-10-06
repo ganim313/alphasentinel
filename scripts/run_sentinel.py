@@ -32,9 +32,10 @@ def run_sentinel_check():
         open_positions = conn.execute("""
             SELECT id, symbol, entry_price, trailing_stop_loss, atr, quantity, status,
                    COALESCE(peak_high, entry_price) as peak_high,
-                   COALESCE(realized_pnl, 0.0) as realized_pnl
+                   COALESCE(realized_pnl, 0.0) as realized_pnl,
+                   target_1, target_2
             FROM positions
-            WHERE status IN ('OPEN', 'TARGET_1_TRIMMED');
+            WHERE status IN ('OPEN', 'TARGET_1_TRIMMED', 'MARKED_FOR_CLOSURE');
         """).fetchall()
 
     if not open_positions:
@@ -81,6 +82,8 @@ def run_sentinel_check():
         pos_status = row[6]
         peak_high = float(row[7]) if row[7] is not None else entry_p
         prior_realized_pnl = float(row[8]) if row[8] is not None else 0.0
+        target_1 = float(row[9]) if len(row) > 9 and row[9] is not None else None
+        target_2 = float(row[10]) if len(row) > 10 and row[10] is not None else None
 
         try:
             import math
@@ -109,7 +112,26 @@ def run_sentinel_check():
             logger.warning(f"Failed to extract live price for {symbol}")
             continue
 
-        # STOP-OUT execution branch:
+        # 0. Liquidate MARKED_FOR_CLOSURE positions immediately once no longer locked at lower circuit
+        if pos_status == 'MARKED_FOR_CLOSURE':
+            from src.execution.order_manager import check_lower_circuit_trap
+            lc_status = check_lower_circuit_trap(symbol, current_price=ltp)
+            if lc_status["is_trapped"]:
+                logger.warning(f"🔒 [{symbol}] Still trapped at Lower Circuit (₹{ltp:.2f}). Holding MARKED_FOR_CLOSURE.")
+                continue
+            exit_p = ltp
+            exit_pnl = round((exit_p - entry_p) * (quantity if quantity is not None else 1), 2)
+            total_realized_pnl = round(prior_realized_pnl + exit_pnl, 2)
+            db_write("""
+                UPDATE positions
+                SET status = 'CLOSED', exit_price = ?, exit_date = CURRENT_DATE,
+                    realized_pnl = ?, current_ltp = ?, unrealized_pnl = 0.0
+                WHERE id = ? AND status = 'MARKED_FOR_CLOSURE';
+            """, (exit_p, total_realized_pnl, ltp, pos_id))
+            logger.info(f"✅ [{symbol}] Liquidated MARKED_FOR_CLOSURE position at ₹{exit_p:.2f} | Realized PnL: ₹{total_realized_pnl:.2f}")
+            continue
+
+        # 1. STOP-OUT execution branch:
         if current_sl is not None and low_price <= current_sl:
             from src.execution.order_manager import check_lower_circuit_trap
             lc_status = check_lower_circuit_trap(symbol, current_price=ltp)
@@ -156,7 +178,148 @@ def run_sentinel_check():
                 )
             continue
 
-        # Dynamic Trailing Stop logic: 1.8x ATR from highest price recorded
+        # 2. INTRADAY TARGET 2 execution branch (for TARGET_1_TRIMMED runner positions):
+        if pos_status == 'TARGET_1_TRIMMED' and target_2 is not None and high_price >= target_2:
+            exit_p = max(ltp, target_2)
+            exit_pnl = round((exit_p - entry_p) * (quantity if quantity is not None else 1), 2)
+            total_realized_pnl = round(prior_realized_pnl + exit_pnl, 2)
+            db_write("""
+                UPDATE positions
+                SET status = 'TARGET_REACHED', exit_price = ?, exit_date = CURRENT_DATE,
+                    realized_pnl = ?, current_ltp = ?, unrealized_pnl = 0.0
+                WHERE id = ? AND status = 'TARGET_1_TRIMMED';
+            """, (exit_p, total_realized_pnl, ltp, pos_id))
+            ret_pct = round((exit_p - entry_p) / entry_p * 100.0, 2) if entry_p else 0.0
+            db_write("""
+                UPDATE agent_memory
+                SET outcome_label = 'WIN', triple_barrier_label = 1, outcome_3d_pct = ?
+                WHERE symbol = ? AND outcome_label IS NULL;
+            """, (ret_pct, symbol))
+            logger.info(f"🏆 INTRADAY TARGET 2 HIT: {symbol} at ₹{high_price:.2f} (T2: ₹{target_2:.2f}) | Realized PnL: ₹{total_realized_pnl:.2f}")
+            try:
+                from scripts.run_eod_reconciliation import log_shariah_purification
+                if exit_pnl > 0:
+                    log_shariah_purification(pos_id, symbol, exit_pnl)
+            except Exception:
+                pass
+            try:
+                from src.notification.telegram_bot import send_telegram_alert
+                import html
+                send_telegram_alert(
+                    f"🏆 <b>INTRADAY TARGET 2 RUNNER HIT: {html.escape(str(symbol))}</b>\n"
+                    f"Exit Price: ₹{exit_p:.2f} (T2: ₹{target_2:.2f})\n"
+                    f"Total Realized PnL: ₹{total_realized_pnl:,.2f}"
+                )
+            except Exception:
+                pass
+            continue
+
+        # 3. INTRADAY TARGET 1 execution branch (50% partial profit booking + breakeven SL ratchet, or full T1+T2 exit if both hit on same bar):
+        if pos_status == 'OPEN' and target_1 is not None and high_price >= target_1:
+            exit_p = max(ltp, target_1)
+            if target_2 is not None and quantity is not None and quantity > 1 and high_price >= target_2:
+                half_qty = quantity // 2
+                rem_qty = quantity - half_qty
+                t1_exit = max(ltp, target_1)
+                t2_exit = max(ltp, target_2)
+                exit_pnl = round((t1_exit - entry_p) * half_qty + (t2_exit - entry_p) * rem_qty, 2)
+                total_realized_pnl = round(prior_realized_pnl + exit_pnl, 2)
+                db_write("""
+                    UPDATE positions
+                    SET status = 'TARGET_REACHED', exit_price = ?, exit_date = CURRENT_DATE,
+                        realized_pnl = ?, current_ltp = ?, unrealized_pnl = 0.0
+                    WHERE id = ? AND status = 'OPEN';
+                """, (t2_exit, total_realized_pnl, ltp, pos_id))
+                ret_pct = round((t2_exit - entry_p) / entry_p * 100.0, 2) if entry_p else 0.0
+                db_write("""
+                    UPDATE agent_memory
+                    SET outcome_label = 'WIN', triple_barrier_label = 1, outcome_3d_pct = ?
+                    WHERE symbol = ? AND outcome_label IS NULL;
+                """, (ret_pct, symbol))
+                logger.info(
+                    f"🏆 INTRADAY TARGET 1 & TARGET 2 HIT ON SAME BAR: {symbol} at ₹{high_price:.2f}! "
+                    f"Closed full position ({half_qty} @ ₹{t1_exit:.2f} + {rem_qty} @ ₹{t2_exit:.2f}) | Realized PnL: ₹{total_realized_pnl:.2f}"
+                )
+                try:
+                    from scripts.run_eod_reconciliation import log_shariah_purification
+                    if exit_pnl > 0:
+                        log_shariah_purification(pos_id, symbol, exit_pnl)
+                except Exception:
+                    pass
+                try:
+                    from src.notification.telegram_bot import send_telegram_alert
+                    import html
+                    send_telegram_alert(
+                        f"🏆 <b>INTRADAY TARGET 1 & 2 REACHED: {html.escape(str(symbol))}</b>\n"
+                        f"Exit Price: ₹{t2_exit:.2f} (T1: ₹{target_1:.2f}, T2: ₹{target_2:.2f})\n"
+                        f"Total Realized PnL: ₹{total_realized_pnl:,.2f}"
+                    )
+                except Exception:
+                    pass
+            elif target_2 is not None and quantity is not None and quantity > 1:
+                half_qty = quantity // 2
+                rem_qty = quantity - half_qty
+                partial_pnl = round((exit_p - entry_p) * half_qty, 2)
+                total_realized_pnl = round(prior_realized_pnl + partial_pnl, 2)
+                breakeven_sl = round(entry_p * 1.005, 2)
+                new_peak = max(peak_high, high_price)
+                eff_atr = atr if (atr is not None and atr > 0) else (entry_p * 0.025)
+                trail_from_peak = round(new_peak - (eff_atr * 1.8), 2)
+                new_sl = max(current_sl or 0.0, breakeven_sl, trail_from_peak)
+                new_unrealized = round((ltp - entry_p) * rem_qty, 2)
+                db_write("""
+                    UPDATE positions
+                    SET status = 'TARGET_1_TRIMMED', quantity = ?, trailing_stop_loss = ?,
+                        peak_high = ?, realized_pnl = ?, unrealized_pnl = ?, current_ltp = ?
+                    WHERE id = ? AND status = 'OPEN';
+                """, (rem_qty, new_sl, new_peak, total_realized_pnl, new_unrealized, ltp, pos_id))
+                logger.info(
+                    f"🎯 INTRADAY TARGET 1 HIT: {symbol} at ₹{high_price:.2f}! "
+                    f"Trimmed 50% ({half_qty} shares @ ₹{exit_p:.2f}, PnL: ₹{partial_pnl:.2f}). "
+                    f"Runner SL ratcheted to ₹{new_sl:.2f} on {rem_qty} shares."
+                )
+                try:
+                    from scripts.run_eod_reconciliation import log_shariah_purification
+                    if partial_pnl > 0:
+                        log_shariah_purification(pos_id, symbol, partial_pnl)
+                except Exception:
+                    pass
+                try:
+                    from src.notification.telegram_bot import send_telegram_alert
+                    import html
+                    send_telegram_alert(
+                        f"🎯 <b>INTRADAY TARGET 1 TRIM: {html.escape(str(symbol))}</b>\n"
+                        f"Trimmed 50% ({half_qty} shares @ ₹{exit_p:.2f})\n"
+                        f"Realized PnL: ₹{partial_pnl:,.2f}\n"
+                        f"Trailing SL ratcheted to ₹{new_sl:.2f} on {rem_qty} runner shares."
+                    )
+                except Exception:
+                    pass
+            else:
+                exit_pnl = round((exit_p - entry_p) * (quantity if quantity is not None else 1), 2)
+                total_realized_pnl = round(prior_realized_pnl + exit_pnl, 2)
+                db_write("""
+                    UPDATE positions
+                    SET status = 'TARGET_REACHED', exit_price = ?, exit_date = CURRENT_DATE,
+                        realized_pnl = ?, current_ltp = ?, unrealized_pnl = 0.0
+                    WHERE id = ? AND status = 'OPEN';
+                """, (exit_p, total_realized_pnl, ltp, pos_id))
+                ret_pct = round((exit_p - entry_p) / entry_p * 100.0, 2) if entry_p else 0.0
+                db_write("""
+                    UPDATE agent_memory
+                    SET outcome_label = 'WIN', triple_barrier_label = 1, outcome_3d_pct = ?
+                    WHERE symbol = ? AND outcome_label IS NULL;
+                """, (ret_pct, symbol))
+                logger.info(f"🎯 INTRADAY TARGET 1 FULL EXIT: {symbol} at ₹{exit_p:.2f} | Realized PnL: ₹{total_realized_pnl:.2f}")
+                try:
+                    from scripts.run_eod_reconciliation import log_shariah_purification
+                    if exit_pnl > 0:
+                        log_shariah_purification(pos_id, symbol, exit_pnl)
+                except Exception:
+                    pass
+            continue
+
+        # 4. Dynamic Trailing Stop logic: 1.8x ATR from highest price recorded
         if atr is None or atr <= 0:
             atr = entry_p * 0.025
             

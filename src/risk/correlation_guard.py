@@ -21,6 +21,7 @@ _LOOKBACK = 60  # trading days
 def evaluate_correlation_guard(
     candidate_symbol: str,
     threshold: Optional[float] = None,
+    fail_closed_on_error: bool = False,
 ) -> Tuple[bool, str, Dict]:
     """
     Returns (passed: bool, reason: str, metrics: dict).
@@ -55,14 +56,18 @@ def evaluate_correlation_guard(
             """, all_syms).df()
 
         if df.empty:
-            return True, "CORR_GUARD_SKIPPED: no price history found in bhavcopy_daily.", {}
+            if fail_closed_on_error:
+                return False, "CORR_GUARD_REJECTED: no price history found in bhavcopy_daily.", {"degraded_sizing_scalar": 0.5}
+            return True, "CORR_GUARD_SKIPPED: no price history found in bhavcopy_daily.", {"degraded_sizing_scalar": 0.5}
 
         pivot = df.pivot(index="trade_date", columns="symbol", values="close_price")
         pivot = pivot.ffill(limit=3).dropna()
         returns = pivot.pct_change().dropna().tail(_LOOKBACK)
 
         if candidate_symbol not in returns.columns or len(returns) < 15:
-            return True, "CORR_GUARD_SKIPPED: insufficient overlapping history.", {}
+            if fail_closed_on_error:
+                return False, "CORR_GUARD_REJECTED: insufficient overlapping history.", {"degraded_sizing_scalar": 0.5}
+            return True, "CORR_GUARD_SKIPPED: insufficient overlapping history.", {"degraded_sizing_scalar": 0.5}
 
         corr_matrix = returns.corr(method="pearson")
         candidate_corrs = {
@@ -73,7 +78,7 @@ def evaluate_correlation_guard(
         }
 
         if not candidate_corrs:
-            return True, "CORR_GUARD_SKIPPED: correlation matrix empty for open positions.", {}
+            return True, "CORR_GUARD_SKIPPED: correlation matrix empty for open positions.", {"degraded_sizing_scalar": 0.5}
 
         avg_corr = float(np.mean(list(candidate_corrs.values())))
         max_sym = max(candidate_corrs, key=lambda k: abs(candidate_corrs[k]))
@@ -96,4 +101,6 @@ def evaluate_correlation_guard(
 
     except Exception as exc:
         logger.error(f"correlation_guard error for {candidate_symbol}: {exc}", exc_info=True)
-        return True, f"CORR_GUARD_ERROR (failing open): {exc}", {}
+        if fail_closed_on_error:
+            return False, f"CORR_GUARD_ERROR (failing closed): {exc}", {"degraded_sizing_scalar": 0.5}
+        return True, f"CORR_GUARD_ERROR (failing open): {exc}", {"degraded_sizing_scalar": 0.5}

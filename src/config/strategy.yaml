@@ -1,6 +1,8 @@
 screening:
   minervini:
     trend_dma_period: 21
+    52w_low_multiplier: 1.25
+    52w_high_multiplier: 0.75
     60d_low_multiplier: 1.25
     60d_high_multiplier: 0.75
   vcp:
@@ -33,5 +35,5 @@ risk:
   sector_exposure:
     max_open_positions: 3
     max_portfolio_pct: 25.0
-  min_conviction_score: 6.5
+  min_conviction_score: 7.0
   daily_drawdown_halt_pct: 3.0

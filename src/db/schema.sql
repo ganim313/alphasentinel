@@ -206,6 +206,7 @@ CREATE INDEX IF NOT EXISTS idx_purification_trade ON purification_log(trade_id);
 -- 13. Instrument Master (Fyers/Dhan Mappings)
 CREATE TABLE IF NOT EXISTS instrument_master (
     symbol VARCHAR PRIMARY KEY,
+    sector VARCHAR,
     fyers_token VARCHAR,
     dhan_security_id VARCHAR,
     exchange VARCHAR DEFAULT 'NSE',

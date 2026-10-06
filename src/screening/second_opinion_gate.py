@@ -97,9 +97,9 @@ def evaluate_second_opinion(symbol: str, conn=None, live_price: float = None, li
 
     def _query_data(c):
         return c.execute("""
-            SELECT trade_date, close_price, high_price, low_price, total_traded_qty as volume, split_multiplier
+            SELECT trade_date, close_price, high_price, low_price, total_traded_qty as volume, delivery_pct, total_traded_val, split_multiplier
             FROM (
-                SELECT trade_date, close_price, high_price, low_price, total_traded_qty, split_multiplier
+                SELECT trade_date, close_price, high_price, low_price, total_traded_qty, delivery_pct, total_traded_val, split_multiplier
                 FROM bhavcopy_daily
                 WHERE symbol = ?
                 ORDER BY trade_date DESC

@@ -33,7 +33,7 @@ from src.notification.trade_card import format_telegram_trade_card
 from src.screening.liquidity_guard import check_liquidity_and_executability
 from src.screening.shariah_filter import check_shariah_compliance
 from src.screening.vcp_screener import evaluate_minervini_vcp_batch
-from src.screening.anti_trap_shield import evaluate_anti_trap_shield
+from src.screening.anti_trap_shield import evaluate_anti_trap_shield, compute_sector_median_pe_map
 from src.screening.ml_predictor import evaluate_ml_probability
 from src.screening.mean_reversion_screener import evaluate_mean_reversion, evaluate_mean_reversion_batch
 from src.ingestion.screener_scraper import scrape_screener_fundamentals
@@ -281,8 +281,28 @@ def run_live_preview_pipeline():
 
         logger.info(f"Pass 2 preliminary technical screen found {len(raw_candidates)} candidates.")
 
-        # Sort candidates to prioritize high-conviction setups before ML scoring
+        # Pre-check fundamentals_cache so known Shariah-non-compliant symbols do not starve the top-15 ML pool
+        known_non_compliant_syms = set()
+        try:
+            import json
+            cached_rows = conn.execute("SELECT symbol, fundamentals_json FROM fundamentals_cache").fetchall()
+            for c_sym, c_json in cached_rows:
+                try:
+                    c_funds = json.loads(c_json)
+                    c_sec = (c_funds.get("sector_name") or "").strip()
+                    is_sh_cached, _ = check_shariah_compliance(
+                        c_funds, sector_name=c_sec if c_sec else "PENDING_SECTOR_SCRAPE"
+                    )
+                    if not is_sh_cached:
+                        known_non_compliant_syms.add(c_sym)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Sort candidates to prioritize Shariah-eligible & high-conviction setups before ML scoring
         raw_candidates.sort(key=lambda x: (
+            x["symbol"] not in known_non_compliant_syms,
             x["has_vcp"],
             x["candidate"]["current_price"] >= x["candidate"]["trigger_price"],
             x["candidate"]["current_price"] / max(x["candidate"]["trigger_price"], 1e-6),
@@ -291,6 +311,7 @@ def run_live_preview_pipeline():
 
         # Defer ML probability: evaluate only the top 15 candidates before Shariah screening
         candidate_pool = raw_candidates[:15]
+        overflow_candidates = raw_candidates[15:]
         for item in candidate_pool:
             item["ml_prob"] = evaluate_ml_probability(item["symbol"], conn)
             if item["candidate"].get("sma_200") is None:
@@ -329,6 +350,15 @@ def run_live_preview_pipeline():
                             live_updated_syms.add(sym)
                             if not item.get("has_vcp"):
                                 item["candidate"]["trigger_price"] = float(c_val)
+
+                        v_val = None
+                        if 'Volume' in live_raw:
+                            if len(cand_tickers_ns) == 1:
+                                v_val = live_raw['Volume'].iloc[-1]
+                            elif ns_sym in live_raw['Volume']:
+                                v_val = live_raw['Volume'][ns_sym].iloc[-1]
+                        if v_val is not None and pd.notna(v_val) and float(v_val) > 0:
+                            item["candidate"]["live_volume"] = float(v_val)
                     except Exception:
                         pass
         except Exception as e:
@@ -360,7 +390,7 @@ def run_live_preview_pipeline():
     ), reverse=True)
 
     shariah_compliant_pool = []
-    # Evaluate candidates (up to top 15 in pool) until 3 compliant candidates found
+    # Evaluate candidates in pool (and overflow if needed) until 3 compliant candidates found
     for item in candidate_pool:
         sym = item["symbol"]
         try:
@@ -379,6 +409,27 @@ def run_live_preview_pipeline():
             logger.warning(f"Failed Shariah check for {sym}: {e}")
             continue
 
+    if len(shariah_compliant_pool) < 3 and overflow_candidates:
+        for item in overflow_candidates:
+            if item["symbol"] in known_non_compliant_syms:
+                continue
+            sym = item["symbol"]
+            try:
+                funds = scrape_screener_fundamentals(sym)
+                sec = funds.get("sector_name", "")
+                is_sh, sh_reason = check_shariah_compliance(funds, sector_name=sec)
+                if is_sh:
+                    with get_read_connection() as conn:
+                        item["ml_prob"] = evaluate_ml_probability(sym, conn)
+                    item["fundamentals"] = funds
+                    item["sector_name"] = sec
+                    shariah_compliant_pool.append(item)
+                    if len(shariah_compliant_pool) >= 3:
+                        break
+            except Exception as e:
+                logger.warning(f"Failed overflow Shariah check for {sym}: {e}")
+                continue
+
     top_candidates = shariah_compliant_pool[:3]
     logger.info(f"Pass 1 complete. Found {len(shariah_compliant_pool)} compliant technical candidates. Proceeding with Top {len(top_candidates)}.")
     for item in top_candidates:
@@ -387,6 +438,7 @@ def run_live_preview_pipeline():
     # 9. Pass 5: Shariah, Anti-Trap, TradingView, and LangGraph Multi-Agent Debate
     debate_app = build_debate_graph()
     approved_candidates = []
+    sector_median_pe_map = compute_sector_median_pe_map()
 
     for item in top_candidates:
         symbol = item["symbol"]
@@ -405,10 +457,18 @@ def run_live_preview_pipeline():
                 item["market_cap_tier"] = tier
 
             sector_name = item.get("sector_name") or fundamentals.get("sector_name", "")
+            sec_median_pe = sector_median_pe_map.get(sector_name)
+            if sec_median_pe is not None:
+                fundamentals["sector_median_pe"] = sec_median_pe
             logger.info(f"[{symbol}] Debating Candidate | Tier: {tier} (Market Cap: ₹{fundamentals.get('market_cap_crores', 0):,.0f} Cr)")
 
             passed_trap, trap_reason, trap_metrics = evaluate_anti_trap_shield(
-                symbol, candidate, fundamentals, live_price=candidate["current_price"]
+                symbol,
+                candidate,
+                fundamentals,
+                live_price=candidate["current_price"],
+                live_volume=candidate.get("live_volume"),
+                sector_median_pe=sec_median_pe,
             )
             if not passed_trap:
                 logger.info(f"[{symbol}] Excluded by strict Anti-Trap Shield (ML Override disabled): {trap_reason}")
@@ -554,11 +614,12 @@ def run_live_preview_pipeline():
                         logger.warning(f"[{symbol}] Risk Arbiter suggested 0 shares. Skipping paper order execution.")
                         db_write("UPDATE screener_candidates SET status = 'SIZING_REJECTED' WHERE id = ?", (cand_id,))
                     else:
-                        # Execute Paper Trade with Risk Arbiter calculated quantity
+                        # Execute Paper Trade with Risk Arbiter calculated quantity at realistic market fill price
                         from src.execution.order_manager import execute_paper_trade
+                        fill_price = max(float(candidate["current_price"]), float(candidate["trigger_price"]))
                         trade_id = execute_paper_trade(
                             symbol=symbol, 
-                            price=candidate["trigger_price"], 
+                            price=fill_price, 
                             atr=real_atr, 
                             quantity=suggested_qty,
                             sector=sector_name,
@@ -585,6 +646,16 @@ def run_live_preview_pipeline():
                 else:
                     logger.info(f"[{symbol}] VETOED by Second Opinion Consensus Gate (Conviction: {conviction:.1f}/10, ML Prob: {ml_prob:.2f}).")
                     db_write("UPDATE screener_candidates SET status = 'VETOED' WHERE id = ?", (cand_id,))
+                    db_write("""
+                        UPDATE agent_memory
+                        SET previous_verdict = 'VETOED',
+                            rejection_reason = ?
+                        WHERE symbol = ? AND memory_date = ?;
+                    """, (
+                        f"Vetoed by Second Opinion Gate (Conviction: {conviction:.1f}/10, ML Prob: {ml_prob:.2f})",
+                        str(symbol),
+                        today_ist.isoformat(),
+                    ))
 
             db_write("""
                 INSERT OR REPLACE INTO debate_transcripts (

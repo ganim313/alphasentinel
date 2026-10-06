@@ -32,6 +32,10 @@ def engineer_live_tick(df, live_price, live_volume, true_high=None, true_low=Non
     
     current_volume = live_volume or 0
     vol_col = 'total_traded_qty' if 'total_traded_qty' in df.columns else 'volume'
+
+    est_traded_val = float(live_price) * float(current_volume) if current_volume > 0 else None
+    if est_traded_val is None and 'total_traded_val' in df.columns and not df['total_traded_val'].dropna().empty:
+        est_traded_val = float(df['total_traded_val'].tail(20).median())
     
     if not df.empty and pd.to_datetime(df['trade_date'].iloc[-1]).normalize() == today_ts:
         # Update last row instead of ignoring new ticks
@@ -40,6 +44,11 @@ def engineer_live_tick(df, live_price, live_volume, true_high=None, true_low=Non
         df.iloc[-1, df.columns.get_loc('low_price')] = min(df.iloc[-1]['low_price'], lp)
         if vol_col in df.columns:
             df.iloc[-1, df.columns.get_loc(vol_col)] = current_volume
+        if 'total_traded_val' in df.columns and est_traded_val is not None:
+            df.iloc[-1, df.columns.get_loc('total_traded_val')] = est_traded_val
+        if 'delivery_pct' in df.columns and pd.isna(df.iloc[-1]['delivery_pct']):
+            prev_deliv = df['delivery_pct'].iloc[:-1].dropna()
+            df.iloc[-1, df.columns.get_loc('delivery_pct')] = float(prev_deliv.tail(20).median()) if not prev_deliv.empty else 50.0
         return df
         
     new_row_dict = {
@@ -50,6 +59,11 @@ def engineer_live_tick(df, live_price, live_volume, true_high=None, true_low=Non
     }
     if vol_col in df.columns or vol_col == 'total_traded_qty':
         new_row_dict[vol_col] = [current_volume]
+    if 'total_traded_val' in df.columns:
+        new_row_dict['total_traded_val'] = [est_traded_val if est_traded_val is not None else 0.0]
+    if 'delivery_pct' in df.columns:
+        med_deliv = float(df['delivery_pct'].tail(20).median()) if not df['delivery_pct'].dropna().empty else 50.0
+        new_row_dict['delivery_pct'] = [med_deliv]
         
     new_row = pd.DataFrame(new_row_dict)
     return pd.concat([df, new_row], ignore_index=True)
@@ -119,21 +133,23 @@ def extract_quantitative_features(df):
     df['sharpe_rank'] = 1 / (1 + np.exp(-ann_sharpe))
 
     # 7. delivery_ratio (OPTIONAL): delivery_pct normalised to 0-1 range.
-    # Neutral value 0.5 used when delivery_pct column is absent (backward compat).
+    # Neutral value 0.5 used when delivery_pct column is absent or NaN (backward compat).
     if 'delivery_pct' in df.columns:
-        df['delivery_ratio'] = (df['delivery_pct'] / 100.0).clip(0, 1)
+        df['delivery_ratio'] = (df['delivery_pct'].fillna(50.0) / 100.0).clip(0, 1)
     else:
         df['delivery_ratio'] = 0.5
 
     # 8. adtv_log (OPTIONAL): log of 20-day average daily traded value.
     # Log-scale is more informative for tree models than raw crores.
     # Neutral value 0.0 (log1p(0)) when traded value data is unavailable.
+    close_col_val = df.get('close_price', df.get('close', pd.Series(0, index=df.index)))
+    vol_col_val = df.get('total_traded_qty', df.get('volume', pd.Series(0, index=df.index)))
+    fallback_traded_val = close_col_val * vol_col_val
     if 'total_traded_val' in df.columns:
-        df['adtv_log'] = np.log1p(df['total_traded_val'].rolling(20, min_periods=5).mean())
+        eff_traded_val = df['total_traded_val'].fillna(fallback_traded_val)
+        df['adtv_log'] = np.log1p(eff_traded_val.rolling(20, min_periods=5).mean()).fillna(0.0)
     else:
-        close_col_val = df.get('close_price', df.get('close', pd.Series(0, index=df.index)))
-        vol_col_val = df.get('total_traded_qty', df.get('volume', pd.Series(0, index=df.index)))
-        df['adtv_log'] = np.log1p((close_col_val * vol_col_val).rolling(20, min_periods=5).mean())
+        df['adtv_log'] = np.log1p(fallback_traded_val.rolling(20, min_periods=5).mean()).fillna(0.0)
 
     # 9. momentum_6m (OPTIONAL): 6-month (126-day) price return.
     # Simple but powerful momentum signal; neutral value 0.0 if insufficient history.

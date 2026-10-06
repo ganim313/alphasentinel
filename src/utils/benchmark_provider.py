@@ -116,17 +116,14 @@ def get_hmm_market_regime(
         return 0
 
 
-def get_market_regime(as_of_date: Optional[object] = None, use_hmm: bool = False) -> int:
+def get_market_regime(as_of_date: Optional[object] = None, use_hmm: bool = True) -> int:
     """
-    Calculates market regime.
-    If use_hmm is True: returns get_hmm_market_regime() (0=Crisis, 1=Choppy, 2=Calm).
-    Default: calculates 1 (Risk-On: Close >= SMA50), 0 (Risk-Off: Close < SMA50).
-    Ensures identical calculation between offline training and live inference.
+    Calculates binary market regime (1 = Risk-On, 0 = Risk-Off / Crisis).
+    When use_hmm is True (default), combines the 3-state Gaussian HMM regime
+    (non-Crisis state > 0) with the SMA50 structural filter (Close >= SMA50).
+    When use_hmm is False, evaluates strictly 1 (Close >= SMA50) or 0 (Close < SMA50).
     Supports pd.Timestamp, datetime.datetime, datetime.date, or string date formats.
     """
-    if use_hmm:
-        return get_hmm_market_regime(as_of_date=as_of_date)
-
     df = get_benchmark_ohlc()
     close = df["Close"].dropna()
     if as_of_date is not None:
@@ -141,7 +138,13 @@ def get_market_regime(as_of_date: Optional[object] = None, use_hmm: bool = False
         raise RuntimeError(f"Insufficient benchmark close history ({len(close)} < {REGIME_DMA_PERIOD})")
 
     sma = close.rolling(REGIME_DMA_PERIOD).mean()
-    return 1 if float(close.iloc[-1]) >= float(sma.iloc[-1]) else 0
+    sma_regime = 1 if float(close.iloc[-1]) >= float(sma.iloc[-1]) else 0
+
+    if use_hmm:
+        hmm_state = get_hmm_market_regime(as_of_date=as_of_date)
+        return 1 if (sma_regime == 1 and hmm_state > 0) else 0
+
+    return sma_regime
 
 
 def get_benchmark_returns(lookback_days: int = 400) -> pd.Series:

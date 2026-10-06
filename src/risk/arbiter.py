@@ -251,7 +251,8 @@ def calculate_deterministic_risk_and_position(
                 open_positions=open_pos_map,
                 candidate_symbol=symbol,
                 candidate_value=candidate_val,
-                core_equity=portfolio_capital_rupees
+                core_equity=portfolio_capital_rupees,
+                fallback_scalar=0.75,
             )
             if vol_scalar < 1.0:
                 logger.info(f"[{symbol}] Volatility target scalar applied: {vol_scalar:.4f}")

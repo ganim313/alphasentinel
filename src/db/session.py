@@ -105,6 +105,12 @@ def init_db() -> None:
                 if "ab_group" not in sc_existing_cols:
                     conn.execute("ALTER TABLE screener_candidates ADD COLUMN ab_group VARCHAR DEFAULT 'control';")
 
+            # Non-destructive migrations for instrument_master
+            im_cols_info = conn.execute("PRAGMA table_info('instrument_master')").fetchall()
+            im_existing_cols = [col[1] for col in im_cols_info]
+            if im_existing_cols and "sector" not in im_existing_cols:
+                conn.execute("ALTER TABLE instrument_master ADD COLUMN sector VARCHAR;")
+
             # Non-destructive migrations for circuit_breaker_state
             cb_cols_info = conn.execute("PRAGMA table_info('circuit_breaker_state')").fetchall()
             cb_existing_cols = [col[1] for col in cb_cols_info]

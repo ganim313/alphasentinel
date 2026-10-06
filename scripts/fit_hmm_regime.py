@@ -25,10 +25,10 @@ MODEL_DIR = PROJECT_ROOT / "models"
 MODEL_PATH = MODEL_DIR / "hmm_regime.pkl"
 
 
-def fit_and_save_hmm(model_path: str = str(MODEL_PATH), lookback_days: int = 756) -> GaussianHMM:
+def fit_and_save_hmm(model_path: str = str(MODEL_PATH), lookback_days: int = 1825) -> GaussianHMM:
     """
     Fits 3-state Gaussian HMM on benchmark log returns.
-    Ensures state ordering: 0=Crisis, 1=Choppy, 2=Calm.
+    Ensures state ordering: 0=Crisis (negative mean return / high vol), 1=Choppy, 2=Calm.
     """
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     df = get_benchmark_ohlc(lookback_days=lookback_days)
@@ -50,6 +50,19 @@ def fit_and_save_hmm(model_path: str = str(MODEL_PATH), lookback_days: int = 756
     raw_model.transmat_ = raw_model.transmat_[order, :][:, order]
     raw_model.means_ = raw_model.means_[order]
     raw_model.covars_ = raw_model.covars_[order].reshape(3, -1)
+
+    # Anchor State 0 (Crisis/Bear) to a strictly negative mean return and highest tail variance
+    # if EM converged all 3 states onto positive drift sub-clusters during a prolonged bull window.
+    flat_rets = returns.flatten()
+    neg_rets = flat_rets[flat_rets < 0.0]
+    emp_neg_tail = float(np.percentile(neg_rets, 25)) if len(neg_rets) > 0 else -max(float(np.std(flat_rets)), 0.005)
+    if float(raw_model.means_[0, 0]) >= 0.0:
+        raw_model.means_[0, 0] = min(emp_neg_tail, float(raw_model.means_[1, 0]) - 1e-4, -0.0025)
+    cov_flat = raw_model.covars_.flatten().copy()
+    max_cov = float(np.max(cov_flat))
+    if float(cov_flat[0]) < max_cov:
+        cov_flat[0] = max_cov * 1.25
+        raw_model.covars_ = cov_flat.reshape(3, -1)
 
     joblib.dump(raw_model, model_path)
     logger.info(
