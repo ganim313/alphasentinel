@@ -1,5 +1,5 @@
 ---
-name: Strix Security Auditor
+name: strix-security-auditor
 description: Orchestrates the Strix open-source AI penetration testing tool to automatically find and remediate vulnerabilities in the codebase before deployment.
 ---
 

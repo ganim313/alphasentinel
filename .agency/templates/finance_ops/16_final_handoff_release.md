@@ -1,9 +1,9 @@
 ---
 template_id: "16"
 phase: 7
-assigned_role: "10_legal_operations_officer"
-context_from: ["07_deployment_runbook.md"]
-outputs_to: ["12_project_post_mortem.md"]
+assigned_role: "finance_ops/legal_operations_officer"
+context_from: ["engineering/07_deployment_runbook.md"]
+outputs_to: ["product_design/12_project_post_mortem.md"]
 status: template
 ---
 # Template 16: Final Legal Handoff & Release of Liability
@@ -37,6 +37,17 @@ Signature: _______________________ Date: _________
 **Client Representative:**
 Signature: _______________________ Date: _________
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 final handoff & release gates and wait for the human lead's explicit approval before transferring credentials.)*
+
+* **Key Decision 1 (Final Invoice Clearance):** `[Confirmed 100% of milestone and change-order invoices have cleared in bank account]`
+* **Key Decision 2 (Credential & IP Transfer):** `[Approved transfer of GitHub repo, cloud hosting, and database admin ownership]`
+* **Key Decision 3 (Liability Release & Warranty):** `[Confirmed mutual signature releasing Agency from post-handoff liability]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -45,6 +56,7 @@ Signature: _______________________ Date: _________
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

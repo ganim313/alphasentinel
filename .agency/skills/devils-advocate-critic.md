@@ -1,5 +1,5 @@
 ---
-name: Devil's Advocate Critic
+name: devils-advocate-critic
 description: Adversarial cross-checking skill that stress-tests and attacks code, architectures, PRDs, and contracts to uncover hidden flaws, race conditions, security vulnerabilities, and scope risks.
 ---
 

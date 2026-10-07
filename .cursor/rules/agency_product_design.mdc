@@ -1,0 +1,12 @@
+---
+description: "Activate when drafting PRDs, SOW proposals, user personas, usability test reports, UI/UX design tokens, 8pt grid layouts, WCAG accessibility, or tracking scope creep."
+globs: [".agency/templates/product_design/**/*", ".agency/active/product_design/**/*", "src/components/**/*"]
+alwaysApply: false
+---
+
+# Department Pod: Product Design
+
+## Assigned Specialists
+- `@product_design/product_manager` (`.agency/agents/product_design/product_manager.md`): Staff Product Manager & Requirements Lead overseeing client intake, SOW scoping, PRDs, and scope creep triage.
+- `@product_design/ui_ux_designer` (`.agency/agents/product_design/ui_ux_designer.md`): Lead UI/UX Designer & Design Systems Specialist governing 8pt grid tokens, typography hierarchy, accessibility contrast, and interactive states.
+- `@product_design/user_researcher` (`.agency/agents/product_design/user_researcher.md`): Principal UX Researcher & Human Factors Specialist leading user discovery interviews, JTBD persona mapping, and quantitative SUS usability testing.

@@ -1,9 +1,9 @@
 ---
 template_id: "10"
-phase: 3
-assigned_role: "03_ui_ux_designer"
-context_from: ["03_requirements_engineering.md"]
-outputs_to: ["05_technical_sdlc_execution.md"]
+phase: 4
+assigned_role: "product_design/ui_ux_designer"
+context_from: ["product_design/03_requirements_engineering.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 10: UI/UX Design Handoff Protocol
@@ -39,6 +39,17 @@ Developers cannot guess how a desktop design looks on a phone.
 ## 5. The Handoff Meeting
 - Conduct a 30-minute sync where the Designer walks the Lead Engineer through the Figma prototype, explaining any complex animations, sticky headers, or transitions.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 UI/UX design system decisions and wait for the human lead's explicit approval before finalizing frontend implementation.)*
+
+* **Key Decision 1 (Design Tokens & 8pt Grid):** `[Confirmed color palette, typography scale, and 8pt spacing tokens]`
+* **Key Decision 2 (Interactive & Empty States):** `[Verified all 4 component states: Loading, Error, Empty, and Success]`
+* **Key Decision 3 (Responsive Breakpoints):** `[Confirmed mobile (375px), tablet (768px), and desktop (1440px) layout behavior]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -47,6 +58,7 @@ Developers cannot guess how a desktop design looks on a phone.
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

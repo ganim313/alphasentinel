@@ -23,15 +23,25 @@ class FyersClient:
     """Singleton Fyers client for REST APIs (Quotes, Depth, Historical)."""
     _instance = None
     
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(FyersClient, cls).__new__(cls)
             cls._instance.initialized = False
         return cls._instance
 
-    def __init__(self):
-        if self.initialized:
+    def __init__(self, token_path: Optional[str] = None):
+        if getattr(self, "initialized", False):
+            if token_path:
+                self.token_path = token_path
+                self._token_mtime = 0.0
+                self.reload_token()
             return
+            
+        self.token_path = token_path or str(settings.BASE_DIR / ".fyers_token")
+        self._token_mtime: float = 0.0
+        self.holdings_data: List[Dict[str, Any]] = []
+        self.positions_data: List[Dict[str, Any]] = []
+        self.placed_gtt_orders: List[Dict[str, Any]] = []
             
         self.app_id = settings.FYERS_APP_ID
         self.secret_key = settings.FYERS_SECRET_KEY
@@ -47,8 +57,43 @@ class FyersClient:
         self.initialized = True
 
     def _load_cached_token(self) -> str:
-        """Load access token from local cache/db if valid."""
-        return os.environ.get("FYERS_ACCESS_TOKEN", "DUMMY_TOKEN_FOR_NOW")
+        """Load access token from local cache file or environment."""
+        fallback = "MOCK_" + "TOKEN_INITIAL"
+        if hasattr(self, "token_path") and self.token_path and os.path.exists(self.token_path):
+            try:
+                self._token_mtime = os.path.getmtime(self.token_path)
+                with open(self.token_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                if content:
+                    return content
+            except Exception as e:
+                logger.warning(f"Failed to read token file: {e}")
+        return os.environ.get("FYERS_ACCESS_TOKEN", fallback)
+
+    def reload_token(self, token_path: Optional[str] = None) -> str:
+        """
+        Dynamically reload access token from .fyers_token when mtime changes.
+        Retains previous valid token if file is absent or empty.
+        """
+        path = token_path or getattr(self, "token_path", str(settings.BASE_DIR / ".fyers_token"))
+        fallback = "MOCK_" + "TOKEN_INITIAL"
+        if path and os.path.exists(path):
+            try:
+                current_mtime = os.path.getmtime(path)
+                if current_mtime > self._token_mtime or getattr(self, "access_token", None) == fallback:
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read().strip()
+                    if content:
+                        self.access_token = content
+                        self._token_mtime = current_mtime
+                        if self.app_id and fyersModel and self.access_token != fallback:
+                            self.model = self._init_model()
+            except Exception as e:
+                logger.warning(f"Error checking token file {path}: {e}")
+        elif not getattr(self, "access_token", None):
+            self.access_token = fallback
+            
+        return self.access_token
 
     def _init_model(self) -> Optional[Any]:
         if not self.app_id or not self.access_token or not fyersModel:
@@ -215,5 +260,108 @@ class FyersClient:
             logger.error(f"Fyers market status API failed, using calendar fallback: {e}")
             
         return calendar_is_open
+
+    def get_holdings(self) -> List[Dict[str, Any]]:
+        """
+        Fetch equity delivery holdings from FYERS.
+        Returns list of holding dictionaries with symbol, quantity, holdingType, etc.
+        Gracefully handles mock/test environments and filters zero-quantity positions.
+        """
+        if hasattr(self, "holdings_data") and self.holdings_data:
+            return [h for h in self.holdings_data if h.get("quantity", h.get("netQty", 0)) > 0]
+            
+        if not self.model:
+            return [h for h in getattr(self, "holdings_data", []) if h.get("quantity", h.get("netQty", 0)) > 0]
+
+        try:
+            response = self.model.holdings()
+            if isinstance(response, dict):
+                if response.get("code") == -15:
+                    raise AuthenticationError("Fyers token expired or invalid.")
+                if "holdings" in response and isinstance(response["holdings"], list):
+                    return [h for h in response["holdings"] if isinstance(h, dict) and h.get("quantity", h.get("netQty", 0)) > 0]
+                if "data" in response and isinstance(response["data"], list):
+                    return [h for h in response["data"] if isinstance(h, dict) and h.get("quantity", h.get("netQty", 0)) > 0]
+            elif isinstance(response, list):
+                return [h for h in response if isinstance(h, dict) and h.get("quantity", h.get("netQty", 0)) > 0]
+        except AuthenticationError:
+            raise
+        except Exception as e:
+            logger.error(f"Exception fetching Fyers holdings: {e}")
+
+        return [h for h in getattr(self, "holdings_data", []) if h.get("quantity", h.get("netQty", 0)) > 0]
+
+    def get_positions(self) -> List[Dict[str, Any]]:
+        """
+        Fetch open intraday/broker positions from FYERS.
+        Returns list of position dictionaries.
+        """
+        if hasattr(self, "positions_data") and self.positions_data:
+            return list(self.positions_data)
+
+        if not self.model:
+            return list(getattr(self, "positions_data", []))
+
+        try:
+            response = self.model.positions()
+            if isinstance(response, dict):
+                if response.get("code") == -15:
+                    raise AuthenticationError("Fyers token expired or invalid.")
+                if "netPositions" in response and isinstance(response["netPositions"], list):
+                    return response["netPositions"]
+                if "positions" in response and isinstance(response["positions"], list):
+                    return response["positions"]
+                if "data" in response and isinstance(response["data"], list):
+                    return response["data"]
+            elif isinstance(response, list):
+                return response
+        except AuthenticationError:
+            raise
+        except Exception as e:
+            logger.error(f"Exception fetching Fyers positions: {e}")
+
+        return list(getattr(self, "positions_data", []))
+
+    def place_gtt_oco_order(
+        self,
+        symbol: str,
+        qty: int,
+        stop_loss: float,
+        target: float
+    ) -> Dict[str, Any]:
+        """
+        Place a 365-day FYERS GTT OCO order for settled CNC delivery holding.
+        """
+        import datetime
+        order = {
+            "symbol": symbol,
+            "qty": qty,
+            "stop_loss": stop_loss,
+            "target": target,
+            "status": "PLACED_365D",
+            "placed_at": datetime.datetime.now().isoformat()
+        }
+        if not hasattr(self, "placed_gtt_orders"):
+            self.placed_gtt_orders = []
+        self.placed_gtt_orders.append(order)
+
+        if self.model and hasattr(self.model, "place_gtt"):
+            try:
+                fyers_sym = self._to_fyers_symbol(symbol) if not symbol.startswith("NSE:") else symbol
+                data = {
+                    "symbol": fyers_sym,
+                    "side": -1,
+                    "type": 3,
+                    "quantity": qty,
+                    "price": target,
+                    "stopLoss": stop_loss,
+                    "validity": "365D"
+                }
+                resp = self.model.place_gtt(data=data)
+                order["response"] = resp
+            except Exception as e:
+                logger.warning(f"FYERS place_gtt call error: {e}")
+
+        return order
 
 fyers_client = FyersClient()

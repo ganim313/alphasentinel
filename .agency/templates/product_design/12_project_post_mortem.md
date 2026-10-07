@@ -1,8 +1,8 @@
 ---
 template_id: "12"
-phase: 8
-assigned_role: "10_legal_operations_officer"
-context_from: ["16_final_handoff_release.md"]
+phase: 7
+assigned_role: "finance_ops/legal_operations_officer"
+context_from: ["finance_ops/16_final_handoff_release.md"]
 outputs_to: []
 status: template
 ---
@@ -39,6 +39,17 @@ status: template
 * Assign specific tasks based on the "Start doing this" discussion.
 * *Example:* "Ahmed will update our standard `package.json` boilerplate to include better ESLint rules before the next project begins."
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 retrospective insights and wait for the human lead's explicit approval before archiving the project.)*
+
+* **Key Decision 1 (Process Improvements):** `[Top engineering or operational changes to codify via continuous-learner]`
+* **Key Decision 2 (Margin & Estimation Review):** `[Actual vs estimated hours variance and pricing model adjustments]`
+* **Key Decision 3 (Playbook Rule Updates):** `[Specific skills or agent charters upgraded from lessons learned]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -47,6 +58,7 @@ status: template
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

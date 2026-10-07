@@ -1,5 +1,5 @@
 ---
-name: Session Resumer & Context Loader
+name: session-resumer
 description: Instantly reads the active project state and deliverables to catch up a fresh AI chat on where the project left off and identify the exact next action.
 ---
 
@@ -31,7 +31,7 @@ Use this skill whenever you open a new chat window, switch AI platforms, or resu
 * **Last Completed Deliverable:** `[e.g. 03_requirements_engineering.md (PRD Signed Off)]`
 
 ### 📋 Immediate Next Step
-* **Role to Assume:** `@[0X_assigned_role.md]`
+* **Role to Assume:** `@.agency/agents/[department]/[assigned_role].md`
 * **Action Required:** `[One-sentence description of the exact next deliverable to produce or code to write]`
 * **Suggested Command to Run:**
   > `"[Exact prompt you can copy-paste to continue immediately]"`

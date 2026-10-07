@@ -1,59 +1,45 @@
-# 🚀 Scenario Runbook: Rapid MVP Launch (Greenfield Sprint)
+# 🚀 Runbook: Rapid MVP Launch & Feature Addition Track
 
-**Objective:** Accelerate an idea from concept to a tested, working fullstack MVP in an compressed timeframe without skipping critical architectural foundations.
-
----
-
-## 👥 Assigned Agent Squad
-
-| Role | Agent File | Primary Mission |
-| :--- | :--- | :--- |
-| **Product Lead** | `@01_product_manager.md` | Define lean user stories, MVP scope boundary, and PRD |
-| **UI/UX Designer** | `@03_ui_ux_designer.md` | Establish 8pt grid, design tokens, and core user flows |
-| **Solutions Architect**| `@02_solutions_architect.md`| Design DB schema, OpenAPI contracts, and tech stack |
-| **Frontend Engineer** | `@04_frontend_engineer.md` | Build responsive UI components with mock API data |
-| **Backend Engineer** | `@05_backend_engineer.md` | Implement REST/GraphQL endpoints, DB queries, and auth |
-| **SDET QA Engineer** | `@07_qa_sdet_engineer.md` | Write Playwright E2E tests for the core conversion flow |
-| **Master Critic** | `@master_critic.md` | Red-team architecture and identify MVP scope bloat |
+**Trigger:** Building a lean greenfield MVP or adding a scoped feature/change order to an existing application (`entry_mode: "feature_addition"`).
+**Objective:** Compress the 7-Phase Agency Lifecycle into a high-velocity track without sacrificing security, code integrity, or commercial scope control.
 
 ---
 
-## ⚡ 4-Stage Execution Flow
+## ⏱️ Step 1: Lean Scope, Change Order & Architecture Lock (Hours 0–4)
+**Active Roles:** `@.agency/agents/product_design/product_manager.md` + `@.agency/agents/engineering/solutions_architect.md`
 
-```mermaid
-flowchart LR
-    S1["Stage 1: Scope & Contract<br/>(@01_product & @02_architect)"] --> S2["Stage 2: Parallel Build<br/>(@04_frontend & @05_backend)"]
-    S2 --> S3["Stage 3: Integration & QA<br/>(@07_qa_sdet & @master_critic)"]
-    S3 --> S4["Stage 4: Deploy & Sign-off<br/>(@09_devops)"]
-```
-
-### Stage 1: Scope & Contract Definition (Hours 0–4)
-1. **Intake & Scope:**
-   > *"Act as `@01_product_manager.md`. Draft a 1-page PRD (`03_requirements_engineering.md`) focused strictly on the single core MVP value proposition."*
-2. **OpenAPI Architecture Contract:**
-   > *"Act as `@02_solutions_architect.md`. Generate the database schema and typed OpenAPI contracts in `04_system_design_architecture.md`."*
-3. **Critic Review:**
-   > *"Act as `@master_critic.md`. Audit the PRD and Architecture to cut non-essential features."*
-
-### Stage 2: Parallel Build Fork (Hours 4–24)
-- **Frontend Stream:**
-  > *"Act as `@04_frontend_engineer.md` and `@03_ui_ux_designer.md`. Build the client UI in `src/` following the OpenAPI contract with typed mock data."*
-- **Backend Stream:**
-  > *"Act as `@05_backend_engineer.md` and `@06_database_engineer.md`. Implement the database schema migrations and API controllers matching the OpenAPI contract."*
-
-### Stage 3: Integration & Quality Gate (Hours 24–30)
-1. Wire frontend API clients to live backend endpoints.
-2. Write automated smoke tests:
-   > *"Act as `@07_qa_sdet_engineer.md`. Write a Playwright E2E test verifying the complete user signup, checkout, and core action flow."*
-
-### Stage 4: Staging Deployment (Hours 30–36)
-1. Deploy to preview environment (Vercel / Fly.io / Render).
-2. Human Lead performs 5-minute visual walkthrough and signs off.
+1. **Scope & Change Order Gate:**
+   - Run `python .agency/scripts/laya_engine.py --classify-scope "<request>"` to verify whether the feature is in-scope or requires `.agency/templates/product_design/32_scope_creep_log.md` and `.agency/templates/finance_ops/14_change_order_form.md`.
+   - Define the core user journey and Gherkin acceptance criteria in `.agency/templates/product_design/03_requirements_engineering.md`.
+2. **Proven Tech Stack & Contracts:**
+   - Read `@.agency/skills/tech-stack-adviser/SKILL.md` and `@.agency/skills/architecture-diagrammer/SKILL.md`.
+   - Document the schema and API contracts in `.agency/templates/engineering/04_system_design_architecture.md`.
+3. **Critic & Human Sign-Off Gate:**
+   - Run `@.agency/agents/oversight/master_critic.md` and obtain **Human Lead Sign-Off**.
 
 ---
 
-## ✅ Definition of Done (DoD)
-1. The primary user loop works end-to-end without console errors.
-2. All inputs validated with Zod/Pydantic schemas.
-3. Database migrations executed and seeded with demo data.
-4. Playwright smoke test passes with 0 failures.
+## 🎨 Step 2: Component-First UI Assembly (Hours 4–12)
+**Active Roles:** `@.agency/agents/product_design/ui_ux_designer.md` + `@.agency/agents/engineering/frontend_engineer.md`
+**Skills:** `@.agency/skills/senior-designer-ui/SKILL.md` & `@.agency/skills/skillui-generator/SKILL.md`
+
+1. Document component tokens and layout specs in `.agency/templates/product_design/10_ui_ux_handoff.md`.
+2. Implement all 4 interactive states for every view: **Loading, Empty, Error, and Populated**.
+
+---
+
+## ⚙️ Step 3: Parallel Vertical Slice Implementation (Hours 12–36)
+**Active Roles:** `@.agency/agents/engineering/backend_engineer.md`, `@.agency/agents/engineering/database_engineer.md`, `@.agency/agents/engineering/frontend_engineer.md`
+**Oversight:** `@.agency/agents/oversight/code_integrity_guardian.md`
+
+1. Run `python .agency/scripts/ripwire_engine.py --plan-lanes 3` and `--merge-scout` to isolate parallel file ownership.
+2. Build database migrations, API routes, authentication, and UI integration, recording progress in `.agency/templates/engineering/05_technical_sdlc_execution.md`.
+3. Run `python .agency/scripts/ripwire_engine.py --quality-delta` and `python .agency/scripts/laya_engine.py --screen-code .` after each slice.
+
+---
+
+## 🚢 Step 4: Smoke Test & Production Ship (Hours 36–48)
+**Active Roles:** `@.agency/agents/engineering/qa_sdet_engineer.md` + `@.agency/agents/engineering/devops_sre_engineer.md`
+
+1. Complete E2E verification in `.agency/templates/engineering/06_testing_uat_signoff.md` and deployment checklist in `.agency/templates/engineering/07_deployment_runbook.md`.
+2. Run `python agency.py validate --advance` and launch!

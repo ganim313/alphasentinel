@@ -1,11 +1,35 @@
 """
-15-Minute Intraday Trailing Stop-Loss Sentinel.
-Monitors open positions, raises trailing stops on new highs, and triggers stop-out alerts.
+================================================================================
+DEPRECATED: scripts/run_sentinel.py
+================================================================================
+DEPRECATION NOTICE:
+This module is DEPRECATED and has been removed from the active trading schedule.
+Under SEBI April 1, 2026 regulations and Justice Mufti Muhammad Taqi Usmani's
+Shariah Bay' qabl al-Qabd prohibition, Indian CNC cash equities cannot be sold
+prior to constructive Demat possession (T+2 settlement morning).
+
+15-minute intraday polling via Yahoo Finance introduced unnecessary slippage, false
+stop-outs, and severe non-compliance by attempting to exit unsettled T0/T1 holdings.
+
+CANONICAL REPLACEMENTS:
+- 19:30 IST Nightly Holdings Guardian (`src/portfolio/fyers_guardian.py`):
+  Evaluates 9-rule priority exit hierarchy (P1 to P9) exclusively on settled Demat holdings.
+- Day 2 Morning: Lodges 365-day server-side FYERS GTT OCO orders (Stop Loss & Target),
+  eliminating the need for continuous intraday polling loops.
+================================================================================
 """
 
 import sys
 import os
+import warnings
 from pathlib import Path
+
+warnings.warn(
+    "scripts/run_sentinel.py is DEPRECATED: T+2 Demat Qabd compliance and FYERS Holdings Guardian "
+    "replace 15-min Yahoo polling.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -23,6 +47,7 @@ logger = logging.getLogger("run_sentinel")
 
 
 def run_sentinel_check():
+    logger.warning("DEPRECATED: run_sentinel.py is running. T+2 Demat Qabd compliance replaces 15-min Yahoo polling.")
     if is_system_halted():
         logger.warning("System is currently HALTED. Sentinel running in DEFENSIVE EXIT-ONLY mode for open positions.")
 

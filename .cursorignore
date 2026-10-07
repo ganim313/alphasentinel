@@ -1,0 +1,5 @@
+# Ensure Ripwire, Antigravity, and Cursor index .agency and .agents across junctions/symlinks
+!.agency/
+!.agency/**
+!.agents/
+!.agents/**

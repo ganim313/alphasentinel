@@ -1,5 +1,5 @@
 ---
-name: WCAG 2.1 AA Accessibility Auditor
+name: wcag-accessibility-auditor
 description: Audits web applications for WCAG 2.1 AA compliance, keyboard navigation, color contrast, and ARIA screen reader attributes.
 ---
 

@@ -1,11 +1,14 @@
 """
 Master Autonomous Scheduler Daemon.
 Orchestrates daily and periodic quantitative trading pipelines:
+- 06:00 AM IST (Mon-Fri): Fyers Instrument Master Sync
 - 08:30 AM IST (Mon-Fri): Pre-market Macro Radar & Corporate Actions
-- Every 15 min (09:15-15:30 IST, Mon-Fri): Real-Time Sentinel Trailing Stop & Risk Monitor
-- 03:15 PM IST (Mon-Fri): Live Screening & Debate Consensus Preview
-- 06:30 PM IST (Mon-Fri): EOD Reconciliation & Ingestion
-- 07:00 PM IST (Mon-Fri): Drawdown & Risk Offloader Check
+- 08:45 AM IST (Mon-Fri): Morning 2FA Token Refresh (scripts/fyers_auth.py)
+- 08:50 AM IST (Mon-Fri): Morning Telegram Digest (send_morning_digest)
+- 09:15-15:30 IST (Mon-Fri): Market Hours (FYERS server-side GTT OCO execution)
+- 19:00 IST (Mon-Fri): Bhavcopy Ingestion (bhavcopy.py)
+- 19:15 IST (Mon-Fri): EOD Screening (vcp_screener.py & regime_engine.py)
+- 19:30 IST (Mon-Fri): Nightly Holdings Guardian (fyers_guardian.py)
 - Sunday 01:00 AM IST: Database Maintenance & Vacuum
 - 1st of Month 08:00 AM IST: Shariah Purification Report
 """
@@ -75,6 +78,10 @@ def run_script(script_name: str, timeout_seconds: int = 600) -> bool:
     """Runs a target script as an isolated subprocess with timeout and logging."""
     script_path = SCRIPTS_DIR / script_name
     if not script_path.exists():
+        script_path = PROJECT_ROOT / script_name
+    if not script_path.exists():
+        script_path = PROJECT_ROOT / "src" / script_name
+    if not script_path.exists():
         logger.error(f"Target script does not exist: {script_path}")
         return False
 
@@ -134,33 +141,122 @@ def job_premarket():
 
 
 def job_sentinel():
-    if not is_market_hours_ist():
-        return
-    logger.info("Triggering 15-Minute Sentinel Intraday Risk Monitor...")
-    run_script("run_sentinel.py", timeout_seconds=180)
+    import warnings
+    warnings.warn("job_sentinel is DEPRECATED. T+2 Demat Qabd compliance replaces 15-min polling.", DeprecationWarning)
+    logger.warning("job_sentinel is DEPRECATED and removed from schedule.")
 
 
 def job_trigger_watcher():
-    if not is_market_hours_ist():
-        return
-    logger.info("Triggering Intraday AWAITING_TRIGGER Watcher...")
-    try:
-        from scripts.run_trigger_watcher import check_and_execute_triggers
-        check_and_execute_triggers()
-    except Exception as e:
-        logger.error(f"Trigger watcher failed: {e}")
+    import warnings
+    warnings.warn("job_trigger_watcher is DEPRECATED. FYERS GTT OCO replaces intraday trigger watcher.", DeprecationWarning)
+    logger.warning("job_trigger_watcher is DEPRECATED and removed from schedule.")
 
 
 def job_live_preview():
+    import warnings
+    warnings.warn("job_live_preview (15:15 rush) is DEPRECATED. EOD screening and 08:50 digest replace 15:15 rush.", DeprecationWarning)
+    logger.warning("job_live_preview is DEPRECATED and removed from schedule.")
+
+
+def job_fyers_auth():
     if not is_weekday_ist():
-        logger.info("Skipping Live Preview task (weekend).")
+        logger.info("Skipping Fyers Auth task (weekend).")
         return
     if _is_holiday_today():
-        logger.info("Today is an official NSE trading holiday. Skipping 3:15 PM screening.")
+        logger.info("Today is an official NSE trading holiday. Skipping Fyers 2FA refresh.")
         return
-    logger.info("Triggering 03:15 PM Live Screening & Debate Preview asynchronously...")
-    t = threading.Thread(target=run_script, args=("run_live_preview.py", 1200), daemon=True)
-    t.start()
+    logger.info("Triggering 08:45 AM Morning 2FA Token Refresh (scripts/fyers_auth.py)...")
+    ok = run_script("fyers_auth.py", timeout_seconds=120)
+    if not ok:
+        try:
+            from scripts.fyers_auth import refresh_fyers_token
+            refresh_fyers_token()
+            logger.info("Fyers token refreshed via in-process fallback.")
+        except Exception as e:
+            logger.error(f"Fyers auth refresh fallback failed: {e}")
+
+
+def job_morning_digest():
+    if not is_weekday_ist():
+        logger.info("Skipping Morning Digest task (weekend).")
+        return
+    if _is_holiday_today():
+        logger.info("Today is an official NSE trading holiday. Skipping morning digest.")
+        return
+    logger.info("Triggering 08:50 AM Morning Telegram Digest (send_morning_digest)...")
+    try:
+        from scripts.run_live_preview import send_morning_digest
+        send_morning_digest()
+    except Exception as e:
+        logger.error(f"Morning digest execution failed: {e}")
+
+
+def job_bhavcopy_ingestion():
+    if not is_weekday_ist():
+        logger.info("Skipping Bhavcopy Ingestion task (weekend).")
+        return
+    if _is_holiday_today():
+        logger.info("Today is an official NSE trading holiday. Skipping Bhavcopy Ingestion.")
+        return
+    logger.info("Triggering 19:00 IST Bhavcopy Ingestion (bhavcopy.py)...")
+    ok = run_script("ingestion/bhavcopy.py", timeout_seconds=600)
+    if not ok:
+        try:
+            from src.ingestion.bhavcopy import fetch_bhavcopy_with_retry_and_fallback, ingest_bhavcopy_dataframe
+            today = datetime.datetime.now(IST).date()
+            df = fetch_bhavcopy_with_retry_and_fallback(today)
+            if df is not None and not df.empty:
+                count = ingest_bhavcopy_dataframe(df, today)
+                logger.info(f"Bhavcopy Ingestion successful: {count} records inserted for {today}.")
+            else:
+                logger.info(f"Bhavcopy for {today} not available or already ingested.")
+        except Exception as e:
+            logger.error(f"Bhavcopy ingestion failed: {e}")
+
+
+def job_eod_screening():
+    if not is_weekday_ist():
+        logger.info("Skipping EOD Screening task (weekend).")
+        return
+    if _is_holiday_today():
+        logger.info("Today is an official NSE trading holiday. Skipping EOD Screening.")
+        return
+    logger.info("Triggering 19:15 IST EOD Screening (vcp_screener.py & regime_engine.py)...")
+    try:
+        from src.db.session import get_read_connection
+        from src.screening.regime_engine import compute_market_regime
+        from src.screening.vcp_screener import evaluate_minervini_vcp_batch
+        with get_read_connection() as conn:
+            regime_state = compute_market_regime(conn)
+            logger.info(f"Market Regime: {regime_state.regime} (Score: {regime_state.score}/3, Allow Entries: {regime_state.allow_new_entries})")
+            if regime_state.allow_new_entries:
+                active_syms = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM bhavcopy_daily WHERE trade_date >= (CURRENT_DATE - INTERVAL 5 DAY)").fetchall()]
+                setups = evaluate_minervini_vcp_batch(active_syms, conn)
+                logger.info(f"EOD Screening complete: {len(setups)} VCP setups identified.")
+            else:
+                logger.info("EOD Screening skipped due to RISK_OFF regime.")
+    except Exception as e:
+        logger.error(f"EOD screening execution failed: {e}")
+
+
+def job_holdings_guardian():
+    if not is_weekday_ist():
+        logger.info("Skipping Holdings Guardian task (weekend).")
+        return
+    if _is_holiday_today():
+        logger.info("Today is an official NSE trading holiday. Skipping Holdings Guardian.")
+        return
+    logger.info("Triggering 19:30 IST Nightly Holdings Guardian (fyers_guardian.py)...")
+    try:
+        from src.db.session import get_write_connection
+        from src.ingestion.fyers_client import FyersClient
+        from src.portfolio.fyers_guardian import reconcile_and_evaluate_holdings
+        with get_write_connection() as conn:
+            fyers_client = FyersClient()
+            audit_result = reconcile_and_evaluate_holdings(conn, fyers_client)
+            logger.info(f"Nightly Holdings Guardian audit complete: {audit_result}")
+    except Exception as e:
+        logger.error(f"Holdings Guardian execution failed: {e}")
 
 
 def job_eod_reconciliation():
@@ -170,7 +266,7 @@ def job_eod_reconciliation():
     if _is_holiday_today():
         logger.info("Today is an official NSE trading holiday. Skipping EOD reconciliation.")
         return
-    logger.info("Triggering 06:30 PM EOD Bhavcopy Ingestion & Trade Reconciliation...")
+    logger.info("Triggering 06:30 PM EOD Trade Reconciliation...")
     run_script("run_eod_reconciliation.py", timeout_seconds=600)
 
 
@@ -267,40 +363,40 @@ def setup_schedule(include_symbol_sync: bool = True):
     # 1. 08:30 AM IST (Mon-Fri): Pre-Market & Corporate Actions
     schedule.every().day.at("08:30", tz).do(job_premarket)
 
-    # 2. Every 15 min: Sentinel (internally checks market hours 09:15 - 15:30 IST)
-    schedule.every(15).minutes.do(job_sentinel)
+    # 2. 08:45 AM IST (Mon-Fri): Morning 2FA Token Refresh (scripts/fyers_auth.py)
+    schedule.every().day.at("08:45", tz).do(job_fyers_auth)
 
-    # 2b. Every 10 min: Intraday AWAITING_TRIGGER Watcher (internally checks market hours)
-    schedule.every(10).minutes.do(job_trigger_watcher)
+    # 3. 08:50 AM IST (Mon-Fri): Morning Telegram Digest (send_morning_digest)
+    schedule.every().day.at("08:50", tz).do(job_morning_digest)
 
-    # 3. 03:15 PM IST (Mon-Fri): Live Preview Screening & Consensus Gate
-    schedule.every().day.at("15:15", tz).do(job_live_preview)
+    # 4. 19:00 IST (Mon-Fri): Bhavcopy Ingestion (bhavcopy.py)
+    schedule.every().day.at("19:00", tz).do(job_bhavcopy_ingestion)
 
-    # 4. 06:30 PM IST (Mon-Fri): EOD Bhavcopy Ingestion & Reconciliation
-    schedule.every().day.at("18:30", tz).do(job_eod_reconciliation)
+    # 5. 19:15 IST (Mon-Fri): EOD Screening (vcp_screener.py & regime_engine.py)
+    schedule.every().day.at("19:15", tz).do(job_eod_screening)
 
-    # 5. 07:00 PM IST (Mon-Fri): Drawdown Sentinel
-    schedule.every().day.at("19:00", tz).do(job_drawdown_check)
+    # 6. 19:30 IST (Mon-Fri): Nightly Holdings Guardian (fyers_guardian.py)
+    schedule.every().day.at("19:30", tz).do(job_holdings_guardian)
 
-    # 6. Sunday 01:00 AM IST: DB Maintenance & Vacuum
+    # 7. Sunday 01:00 AM IST: DB Maintenance & Vacuum
     schedule.every().sunday.at("01:00", tz).do(job_db_maintenance)
 
-    # 7. Daily 08:00 AM IST check for 1st of Month: Purification Report
+    # 8. Daily 08:00 AM IST check for 1st of Month: Purification Report
     schedule.every().day.at("08:00", tz).do(job_monthly_purification)
 
-    # 8. Sunday 08:00 PM IST: Weekly Performance Evaluator
+    # 9. Sunday 08:00 PM IST: Weekly Performance Evaluator
     schedule.every().sunday.at("20:00", tz).do(job_weekly_evaluator).tag("weekly_evaluator")
 
-    # 9. Sunday 08:30 PM IST: Weekly Dynamic Feedback Learning Loop
+    # 10. Sunday 08:30 PM IST: Weekly Dynamic Feedback Learning Loop
     schedule.every().sunday.at("20:30", tz).do(job_weekly_feedback_loop).tag("weekly_feedback_loop")
 
-    # 10. Daily 02:00 AM IST: Nightly DuckDB Cloud Backup
+    # 11. Daily 02:00 AM IST: Nightly DuckDB Cloud Backup
     schedule.every().day.at("02:00", tz).do(job_nightly_backup).tag("nightly_backup")
 
-    # 11. Daily 00:30 AM IST check for 1st of Month: HMM Regime Refit
+    # 12. Daily 00:30 AM IST check for 1st of Month: HMM Regime Refit
     schedule.every().day.at("00:30", tz).do(job_monthly_hmm_refit).tag("monthly_hmm_refit")
 
-    # 12. Daily 01:30 AM IST check for 1st of Month: Global XGBoost Model Retraining
+    # 13. Daily 01:30 AM IST check for 1st of Month: Global XGBoost Model Retraining
     schedule.every().day.at("01:30", tz).do(job_monthly_retrain).tag("monthly_retrain")
 
 

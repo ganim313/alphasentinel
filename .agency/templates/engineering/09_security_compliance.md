@@ -1,9 +1,9 @@
 ---
 template_id: "09"
 phase: 5
-assigned_role: "08_security_auditor"
-context_from: ["04_system_design_architecture.md"]
-outputs_to: []
+assigned_role: "engineering/security_auditor"
+context_from: ["engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/07_deployment_runbook.md"]
 status: template
 ---
 # Template 09: Security & Compliance Audit Checklist
@@ -30,6 +30,17 @@ Execute this checklist before UAT begins.
 - [ ] **Data Deletion:** Is there a process for users to request account deletion (Right to be Forgotten)?
 - [ ] **PII Handling:** Are Personally Identifiable Information (PII) fields (like phone numbers or credit cards) encrypted at rest?
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 security audit findings and wait for the human lead's explicit approval before proceeding to Deployment.)*
+
+* **Key Decision 1 (OWASP & RLS Posture):** `[Confirmed zero Critical/High SQLi, XSS, IDOR, or missing tenant RLS vulnerabilities]`
+* **Key Decision 2 (Secret & Header Hygiene):** `[Verified zero leaked secrets in git history and strict CSP/HSTS headers]`
+* **Key Decision 3 (Data Privacy & PII):** `[Confirmed encryption at rest and GDPR/CCPA deletion workflow compliance]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -38,6 +49,7 @@ Execute this checklist before UAT begins.
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

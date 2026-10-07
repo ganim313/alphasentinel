@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "path": ".agents/plugins"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "agency-playbook",
+      "path": ".agents/plugins/agency-playbook",
+      "enabled": true
+    }
+  ]
+}

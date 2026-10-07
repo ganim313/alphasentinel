@@ -1,5 +1,5 @@
 ---
-name: Tech Stack Adviser & Debater
+name: tech-stack-adviser
 description: Adversarial trade-off evaluation skill that rigorously debates, challenges, and justifies technology stack selections (Frameworks, Databases, Auth, Hosting) across Velocity, Cost, Complexity, and Scalability.
 ---
 

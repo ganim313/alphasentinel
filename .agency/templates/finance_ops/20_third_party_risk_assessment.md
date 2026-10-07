@@ -1,9 +1,9 @@
 ---
 template_id: "20"
-phase: 2
-assigned_role: "08_security_auditor"
-context_from: ["04_system_design_architecture.md"]
-outputs_to: []
+phase: 5
+assigned_role: "engineering/security_auditor"
+context_from: ["engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/09_security_compliance.md"]
 status: template
 ---
 # Template 20: Third-Party Risk Assessment
@@ -34,6 +34,23 @@ List every third-party service the application relies on to function.
 * Evaluate how deeply tied the codebase is to proprietary SDKs.
 * *Example:* "We use Next.js, which is heavily optimized for Vercel. However, we are not using Vercel-specific proprietary features (like Vercel KV), meaning the app can be containerized using Docker and deployed anywhere if necessary."
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
+
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Note 1: e.g., Approved vendor lock-in mitigation strategies and fallback SLAs.]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -46,4 +63,4 @@ List every third-party service the application relies on to function.
 
 ### Context Package for Next Agent
 The following artifacts must be passed to the next phase:
-- [ ] 20_third_party_risk_assessment.md
+- [ ] `finance_ops/20_third_party_risk_assessment.md`

@@ -1,9 +1,9 @@
 ---
 template_id: "15"
-phase: 4
-assigned_role: "02_solutions_architect"
-context_from: ["04_system_design_architecture.md"]
-outputs_to: []
+phase: 3
+assigned_role: "engineering/solutions_architect"
+context_from: ["engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 15: Developer Onboarding Protocol
@@ -35,6 +35,17 @@ Ensure they understand the agency's strict SDLC rules:
 - [ ] All code must pass ESLint and Prettier before a PR is opened.
 - [ ] They must request a code review from the Lead Engineer (You) before any code is merged.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 developer onboarding & access controls and wait for the human lead's explicit approval before granting repository access.)*
+
+* **Key Decision 1 (NDA & Work-for-Hire):** `[Confirmed signed contractor agreement and NDA on file]`
+* **Key Decision 2 (Least-Privilege Boundaries):** `[Confirmed main branch protection and zero production DB/API key exposure]`
+* **Key Decision 3 (Local Build Verification):** `[Verified clean local setup and passing test suite in <15 minutes]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -43,6 +54,7 @@ Ensure they understand the agency's strict SDLC rules:
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

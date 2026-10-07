@@ -2,8 +2,8 @@
 template_id: "29"
 phase: 1
 assigned_role: "sales_client/account_manager"
-context_from: ["01_proposal_sow.md", "02_msa_contract.md"]
-outputs_to: ["03_requirements_engineering.md"]
+context_from: ["product_design/01_proposal_sow.md", "finance_ops/02_msa_contract.md"]
+outputs_to: ["product_design/03_requirements_engineering.md"]
 status: template
 ---
 # Template 29: Client Onboarding Checklist & Kickoff Protocol
@@ -54,14 +54,24 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Access Readiness):** `[Confirmation that all critical developer credentials have been provisioned]`
 * **Key Decision 2 (Communication Cadence):** `[Agreement on daily Slack check-ins and Friday demo schedule]`
 * **Key Decision 3 (Escalation Path):** `[Confirmed contact channels for executive decision makers]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -74,4 +84,4 @@ status: template
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 29_client_onboarding_checklist.md
+- [ ] `sales_client/29_client_onboarding_checklist.md`

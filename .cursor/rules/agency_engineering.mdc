@@ -1,0 +1,17 @@
+---
+description: "Activate when designing system architecture, writing frontend (React/Next.js), backend APIs, database migrations/RLS, mobile apps, QA/Playwright tests, security audits, or DevOps CI/CD pipelines."
+globs: ["src/**/*.{ts,tsx,js,jsx,py,go,rs}", "app/**/*", "prisma/**/*", "migrations/**/*", "tests/**/*"]
+alwaysApply: false
+---
+
+# Department Pod: Engineering
+
+## Assigned Specialists
+- `@engineering/solutions_architect` (`.agency/agents/engineering/solutions_architect.md`): Principal Solutions & Systems Architect designing HLD, LLD, Mermaid ERDs, OpenAPI contracts, and Ripwire task partitions.
+- `@engineering/frontend_engineer` (`.agency/agents/engineering/frontend_engineer.md`): Senior/Staff Frontend Engineer building type-safe, accessible, responsive web and desktop client applications.
+- `@engineering/backend_engineer` (`.agency/agents/engineering/backend_engineer.md`): Senior/Staff Backend Engineer building type-safe APIs, service layers, ACID transactions, auth middleware, and background workers.
+- `@engineering/database_engineer` (`.agency/agents/engineering/database_engineer.md`): Database Administrator & Data Systems Engineer governing schema migrations, indexing, connection pooling, and Row-Level Security (RLS).
+- `@engineering/qa_sdet_engineer` (`.agency/agents/engineering/qa_sdet_engineer.md`): QA Lead & Software Development Engineer in Test (SDET) governing the Testing Pyramid, Playwright E2E automation, and client UAT sign-off.
+- `@engineering/security_auditor` (`.agency/agents/engineering/security_auditor.md`): Application Security Lead & Red Team Penetration Tester executing SAST/DAST scans, OWASP Top 10 audits, and secret leak prevention.
+- `@engineering/devops_sre_engineer` (`.agency/agents/engineering/devops_sre_engineer.md`): DevOps & Site Reliability Engineer automating CI/CD pipelines, zero-downtime deployments, stack-trace triage, and disaster recovery.
+- `@engineering/mobile_app_engineer` (`.agency/agents/engineering/mobile_app_engineer.md`): Staff Mobile & Cross-Platform Application Architect building production iOS, Android, React Native, and Flutter applications.

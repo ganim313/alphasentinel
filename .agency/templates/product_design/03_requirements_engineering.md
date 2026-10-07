@@ -1,9 +1,9 @@
 ---
 template_id: "03"
 phase: 2
-assigned_role: "01_product_manager"
-context_from: ["01_proposal_sow.md", "13_client_intake_questionnaire.md"]
-outputs_to: ["04_system_design_architecture.md"]
+assigned_role: "product_design/product_manager"
+context_from: ["product_design/01_proposal_sow.md", "sales_client/13_client_intake_questionnaire.md"]
+outputs_to: ["engineering/04_system_design_architecture.md"]
 status: template
 ---
 # Template 03: Requirements Engineering (BRD, PRD, SRS)

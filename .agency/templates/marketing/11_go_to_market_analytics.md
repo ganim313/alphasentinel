@@ -1,8 +1,8 @@
 ---
 template_id: "11"
 phase: 7
-assigned_role: "10_legal_operations_officer"
-context_from: ["01_proposal_sow.md"]
+assigned_role: "marketing/growth_hacker"
+context_from: ["product_design/01_proposal_sow.md", "engineering/07_deployment_runbook.md"]
 outputs_to: []
 status: template
 ---
@@ -34,6 +34,17 @@ You must be able to measure traffic and user behavior on Day 1.
 - [ ] **404 Page:** Create a custom, branded 404 Error page that redirects users back to the home page or catalog.
 - [ ] **Email Delivery (SendGrid/Resend):** Verify production domains so transactional emails (e.g., "Order Confirmed") do not go to the customer's Spam folder.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 GTM & analytics decisions and wait for the human lead's explicit approval before closing Phase 7.)*
+
+* **Key Decision 1 (SEO & Crawlability):** `[Verified meta tags, OG images, sitemap.xml, and production robots.txt]`
+* **Key Decision 2 (Conversion Telemetry):** `[Confirmed GA4/PostHog/Mixpanel funnel events and Sentry error monitoring]`
+* **Key Decision 3 (Domain & Deliverability):** `[Verified SPF/DKIM/DMARC records for transactional email delivery]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -42,6 +53,7 @@ You must be able to measure traffic and user behavior on Day 1.
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

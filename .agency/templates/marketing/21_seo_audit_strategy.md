@@ -2,8 +2,8 @@
 template_id: "21"
 phase: 5
 assigned_role: "marketing/seo_engineer"
-context_from: ["03_requirements_engineering.md", "11_go_to_market_analytics.md"]
-outputs_to: ["07_deployment_runbook.md"]
+context_from: ["product_design/03_requirements_engineering.md", "marketing/11_go_to_market_analytics.md"]
+outputs_to: ["engineering/07_deployment_runbook.md"]
 status: template
 ---
 # Template 21: Technical SEO Audit & Search Strategy
@@ -55,14 +55,24 @@ Define JSON-LD schema markup templates and Open Graph standards:
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Keyword Focus):** `[Summary of targeted primary keyword clusters]`
 * **Key Decision 2 (Schema Architecture):** `[Selected Schema.org structured data types]`
 * **Key Decision 3 (Robots & Indexing):** `[Confirmation of crawl boundaries and sitemap generation]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -75,4 +85,4 @@ Define JSON-LD schema markup templates and Open Graph standards:
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 21_seo_audit_strategy.md
+- [ ] `marketing/21_seo_audit_strategy.md`

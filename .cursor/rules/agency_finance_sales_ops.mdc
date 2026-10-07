@@ -1,0 +1,14 @@
+---
+description: "Activate when drafting MSAs, DPAs, SLAs, change orders, financial pricing & burn models, timesheets, client intake questionnaires, or weekly status reports."
+globs: [".agency/templates/finance_ops/**/*", ".agency/templates/sales_client/**/*", ".agency/active/finance_ops/**/*", ".agency/active/sales_client/**/*"]
+alwaysApply: false
+---
+
+# Department Pod: Finance Ops
+
+## Assigned Specialists
+- `@finance_ops/legal_operations_officer` (`.agency/agents/finance_ops/legal_operations_officer.md`): Agency Operations, Legal Risk & Client Success Director governing MSAs, DPAs, SLAs, IP retention, and final handoff releases.
+- `@finance_ops/finance_strategist` (`.agency/agents/finance_ops/finance_strategist.md`): Principal Agency Finance Strategist & Commercial Pricing Lead governing TCV modeling, COGS pass-through, burn-rate tracking, and margin targets.
+- `@finance_ops/administrative_ops` (`.agency/agents/finance_ops/administrative_ops.md`): Senior Agency Operations & Delivery Coordinator managing onboarding checklists, developer access provisioning, timesheet governance, and phase hygiene.
+- `@sales_client/account_manager` (`.agency/agents/sales_client/account_manager.md`): Principal Client Partner & Account Director governing stakeholder communications, weekly RAG reporting, kickoff alignment, and scope boundary defense.
+- `@sales_client/business_development_rep` (`.agency/agents/sales_client/business_development_rep.md`): Senior Business Development & Lead Qualification Strategist screening inbound leads, conducting discovery intake, and drafting commercial proposals.

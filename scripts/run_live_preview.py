@@ -81,6 +81,205 @@ def get_active_universe(conn, as_of_date: Optional[datetime.date] = None):
         GROUP BY b.symbol
     """, (cutoff_date, ref_date)).fetchall()
 
+
+def evaluate_consensus_gate(
+    conviction: float,
+    ml_prob: float,
+    ml_cutoff: float = 0.75,
+    graph_completed: Optional[bool] = None
+) -> Dict[str, Any]:
+    """
+    Evaluates the Second Opinion Consensus Gate with Decoupled ML Shadow Telemetry.
+    Execution gate is strictly: graph_completed and (conviction >= 7.0).
+    ML probability is evaluated purely for non-blocking shadow telemetry.
+    """
+    if graph_completed is None:
+        graph_completed = conviction >= 0.0
+    gate_approved = bool(graph_completed and (conviction >= 7.0))
+    shadow_approved = bool(ml_prob >= ml_cutoff)
+    return {
+        "gate_approved": gate_approved,
+        "conviction": conviction,
+        "ml_prob": ml_prob,
+        "ml_cutoff": ml_cutoff,
+        "shadow_approved": shadow_approved,
+        "graph_completed": graph_completed,
+    }
+
+
+def format_morning_digest_trade_card(trade: Dict[str, Any]) -> str:
+    """
+    Outputs clean Trade Cards formatted for 60-second manual FYERS App entry:
+    - Symbol (e.g. NSE:TITAN-EQ)
+    - Order Type: CNC Limit Buy
+    - Limit Entry Price (₹)
+    - Initial Stop Loss (₹)
+    - Target 1 (₹, +2R)
+    - Target 2 (₹, +3.5R)
+    - Quantity (Calculated from unchoked risk parity)
+    - Allocation %
+    - GTT OCO lodging instructions on Day 2.
+    """
+    raw_sym = str(trade.get("symbol", "UNKNOWN")).replace(".NS", "").strip()
+    if raw_sym.startswith("NSE:") and raw_sym.endswith("-EQ"):
+        fyers_symbol = raw_sym
+        bare_symbol = raw_sym[4:-3]
+    elif raw_sym.startswith("NSE:"):
+        bare_symbol = raw_sym[4:]
+        fyers_symbol = f"{raw_sym}-EQ"
+    else:
+        bare_symbol = raw_sym
+        fyers_symbol = f"NSE:{raw_sym}-EQ"
+
+    limit_price = float(trade.get("limit_entry_price") or trade.get("trigger_price") or trade.get("entry_price") or 0.0)
+    stop_loss = float(trade.get("stop_loss_price") or trade.get("initial_stop") or 0.0)
+
+    # R distance calculations
+    risk_r = (limit_price - stop_loss) if limit_price > stop_loss else 0.0
+    target_1 = float(trade.get("target_1_price") or trade.get("target_1") or (limit_price + 2.0 * risk_r if risk_r > 0 else limit_price * 1.10))
+    target_2 = float(trade.get("target_2_price") or trade.get("target_2") or (limit_price + 3.5 * risk_r if risk_r > 0 else limit_price * 1.20))
+
+    quantity = int(trade.get("suggested_shares") or trade.get("quantity") or 0)
+    alloc_pct = float(trade.get("portfolio_allocation_pct") or trade.get("allocation_pct") or 0.0)
+    if alloc_pct <= 0.0 and quantity > 0 and limit_price > 0:
+        alloc_pct = round((quantity * limit_price / 1_000_000.0) * 100.0, 1)
+
+    stop_pct = ((limit_price - stop_loss) / limit_price * 100.0) if limit_price > 0 else 0.0
+    t1_pct = ((target_1 - limit_price) / limit_price * 100.0) if limit_price > 0 else 0.0
+    t2_pct = ((target_2 - limit_price) / limit_price * 100.0) if limit_price > 0 else 0.0
+
+    card = (
+        f"📋 <b>TRADE CARD: {fyers_symbol}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• <b>Symbol:</b> <code>{fyers_symbol}</code>\n"
+        f"• <b>Order Type:</b> CNC Limit Buy\n"
+        f"• <b>Limit Entry Price:</b> ₹{limit_price:,.2f}\n"
+        f"• <b>Initial Stop Loss:</b> ₹{stop_loss:,.2f} (-{stop_pct:.1f}%)\n"
+        f"• <b>Target 1 (+2R):</b> ₹{target_1:,.2f} (+{t1_pct:.1f}%)\n"
+        f"• <b>Target 2 (+3.5R):</b> ₹{target_2:,.2f} (+{t2_pct:.1f}%)\n"
+        f"• <b>Quantity:</b> {quantity:,} shares\n"
+        f"• <b>Allocation %:</b> {alloc_pct:.1f}%\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <b>Day 2 GTT OCO Lodging Instructions:</b>\n"
+        f"1. Do NOT place exit orders on Day 0 or Day 1 (T+2 Demat Qabd compliance).\n"
+        f"2. On Day 2 morning upon Demat delivery, open FYERS App -> Holdings -> {bare_symbol}.\n"
+        f"3. Lodge 365-day GTT OCO order:\n"
+        f"   - Stop Loss Trigger: ₹{stop_loss:,.2f}\n"
+        f"   - Target Trigger: ₹{target_2:,.2f}\n"
+    )
+    return card
+
+
+def format_morning_digest(
+    approved_trades: List[Dict[str, Any]],
+    regime: Optional[str] = None,
+    scan_date: Optional[str] = None
+) -> str:
+    """
+    Formats the complete 08:50 AM IST Morning Telegram Digest containing Trade Cards
+    for 60-second manual FYERS App entry.
+    """
+    from zoneinfo import ZoneInfo
+    now_ist = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
+    date_str = scan_date or now_ist.strftime("%d-%b-%Y")
+    regime_str = regime or "RISK_ON"
+
+    header = (
+        f"🌅 <b>ALPHASENTINEL 08:50 IST MORNING DIGEST</b>\n"
+        f"📅 <b>Date:</b> {date_str} | <b>Regime:</b> {regime_str}\n"
+        f"⏱️ <i>60-Second Manual FYERS App Entry Summary</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    if not approved_trades:
+        body = (
+            "🛡️ <b>No New Actionable Setups Today</b>\n"
+            "Capital preserved — all risk filters held firm.\n"
+            "Monitor existing positions via Holdings Guardian."
+        )
+    else:
+        body = "\n\n".join(format_morning_digest_trade_card(t) for t in approved_trades)
+
+    footer = (
+        f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <i>Enter CNC Limit Buy orders before 09:15 AM IST market open.</i>"
+    )
+    return header + body + footer
+
+
+def send_morning_digest(as_of_date: Optional[datetime.date] = None, conn=None) -> str:
+    """
+    08:50 AM IST Morning Telegram Digest dispatcher.
+    Queries latest approved candidates from DuckDB, formats trade cards for
+    60-second manual FYERS CNC entry, and dispatches to Telegram.
+    """
+    from zoneinfo import ZoneInfo
+    today = as_of_date or datetime.datetime.now(ZoneInfo("Asia/Kolkata")).date()
+
+    trades = []
+    regime_desc = "RISK_ON"
+
+    def _query(c):
+        nonlocal regime_desc, trades
+        try:
+            from src.screening.regime_engine import compute_market_regime
+            reg_state = compute_market_regime(c, as_of_date=today.isoformat())
+            regime_desc = f"{reg_state.regime} (Score: {reg_state.score}/3)"
+        except Exception:
+            pass
+
+        rows = c.execute("""
+            SELECT s.symbol, s.trigger_price, s.pattern_type, s.market_cap_tier,
+                   d.suggested_shares, d.stop_loss, d.target_1, d.target_2, d.conviction_score
+            FROM screener_candidates s
+            LEFT JOIN debate_transcripts d ON s.symbol = d.symbol AND s.scan_date = d.debate_date
+            WHERE s.status = 'APPROVED'
+              AND s.scan_date >= ?
+            ORDER BY s.scan_date DESC, s.trigger_price DESC
+        """, ((today - datetime.timedelta(days=3)).isoformat(),)).fetchall()
+
+        for r in rows:
+            sym = r[0]
+            trig = float(r[1] or 0.0)
+            shares = int(r[4] or 0)
+            sl = float(r[5] or 0.0)
+            t1 = float(r[6] or 0.0)
+            t2 = float(r[7] or 0.0)
+            alloc_pct = round((shares * trig / 1_000_000.0 * 100.0), 1) if trig > 0 else 0.0
+            trades.append({
+                "symbol": sym,
+                "fyers_symbol": f"NSE:{sym}-EQ",
+                "order_type": "CNC Limit Buy",
+                "limit_entry_price": trig,
+                "trigger_price": trig,
+                "stop_loss_price": sl,
+                "target_1_price": t1,
+                "target_2_price": t2,
+                "suggested_shares": shares,
+                "quantity": shares,
+                "portfolio_allocation_pct": alloc_pct,
+                "conviction_score": float(r[8] or 7.0)
+            })
+
+    try:
+        if conn is not None:
+            _query(conn)
+        else:
+            with get_read_connection() as r_conn:
+                _query(r_conn)
+    except Exception as e:
+        logger.warning(f"Error querying DuckDB for morning digest trades: {e}")
+
+    digest = format_morning_digest(trades, regime=regime_desc, scan_date=today.strftime("%d-%b-%Y"))
+    try:
+        from src.notification.telegram_bot import send_telegram_alert
+        send_telegram_alert(digest)
+        logger.info("08:50 AM IST Morning Digest dispatched to Telegram.")
+    except Exception as e:
+        logger.warning(f"Failed to send Morning Digest via Telegram: {e}")
+
+    return digest
+
+
 def run_live_preview_pipeline():
     logger.info("=" * 70)
     logger.info("STARTING 03:15 PM LIVE PREVIEW SCREENER & MULTI-AGENT DEBATE")
@@ -262,6 +461,7 @@ def run_live_preview_pipeline():
             cand_tier = market_cap_tier_map.get(symbol, "SMALL")
             cand_sma200 = vcp_candidate.get("sma_200") if vcp_candidate else mr_sma200
 
+            vcp_cand = vcp_candidate or {}
             raw_candidates.append({
                 "symbol": symbol,
                 "candidate": {
@@ -269,7 +469,10 @@ def run_live_preview_pipeline():
                     "current_price": cur_price,
                     "trigger_price": trig_price,
                     "sma_200": float(cand_sma200) if cand_sma200 is not None else None,
-                    "regime_bypass_size_reduction": vcp_candidate.get("regime_bypass_size_reduction", 1.0) if vcp_candidate else 1.0
+                    "regime_bypass_size_reduction": vcp_candidate.get("regime_bypass_size_reduction", 1.0) if vcp_candidate else 1.0,
+                    "rs_score": float(vcp_cand.get("rs_score", 0.0) or 0.0),
+                    "delivery_pct": float(vcp_cand.get("delivery_pct", 0.0) or 0.0),
+                    "pct_from_52w_high": float(vcp_cand.get("pct_from_52w_high", 0.0) or 0.0),
                 },
                 "circuit_band": circuit_band_map.get(symbol, 20.0),
                 "market_cap_tier": cand_tier,
@@ -382,11 +585,13 @@ def run_live_preview_pipeline():
             filtered_pool.append(item)
         candidate_pool = filtered_pool
 
-    # 8. Pass 4: Sort and Shariah Screen (Top-N with Cache First)
+    # 8. Pass 4: Sort prioritizing deterministic VCP contraction and technical rank rather than gating on ML probability
     candidate_pool.sort(key=lambda x: (
         x["has_vcp"],
         x["candidate"]["current_price"] >= x["candidate"]["trigger_price"],
-        x["ml_prob"]
+        float(x["candidate"].get("rs_score", 0.0)),
+        x["candidate"]["current_price"] / max(x["candidate"]["trigger_price"], 1e-6),
+        x["l_metrics"].get("adtv_20d_rupees", 0.0)
     ), reverse=True)
 
     shariah_compliant_pool = []
@@ -582,10 +787,14 @@ def run_live_preview_pipeline():
                 str(ab_group)
             ), sync=True)
 
+            # Shadow telemetry: Log ml_prob as non-blocking shadow telemetry
+            shadow_approved = ml_prob >= ml_cutoff
+            logger.info(f"[{symbol}] ML Shadow Score: {ml_prob:.4f} (Cutoff: {ml_cutoff}, Shadow Approved: {shadow_approved})")
+
             if initial_status == "PENDING_REVIEW":
                 logger.info(f"[{symbol}] Running Second Opinion Consensus Gate synchronously (ab_group={ab_group}, ml_cutoff={ml_cutoff})...")
                 
-                # Joint consensus gate: Judge Conviction >= 7.0 AND XGBoost ML Probability >= ml_cutoff
+                # Joint consensus gate: Judge Conviction >= 7.0 (ML decoupled to shadow telemetry)
                 conv_val = final_state.get("conviction_score")
                 try:
                     conviction = float(conv_val) if conv_val is not None else -1.0
@@ -594,10 +803,10 @@ def run_live_preview_pipeline():
                 graph_completed = conviction >= 0.0
                 if not graph_completed:
                     logger.error(f"[{symbol}] Debate graph failed to produce a valid judge verdict (conviction={conviction}). Failing closed.")
-                gate_approved = graph_completed and (conviction >= 7.0) and (ml_prob >= ml_cutoff)
+                gate_approved = graph_completed and (conviction >= 7.0)
                 
                 if gate_approved:
-                    logger.info(f"[{symbol}] Second Opinion APPROVED (Conviction: {conviction:.1f}/10, ML Prob: {ml_prob:.2f}).")
+                    logger.info(f"[{symbol}] Second Opinion APPROVED (Conviction: {conviction:.1f}/10, Shadow ML Prob: {ml_prob:.4f}).")
                     
                     # Breakout confirmation: price must reach or exceed trigger price
                     if candidate["current_price"] < candidate["trigger_price"]:
@@ -644,7 +853,7 @@ def run_live_preview_pipeline():
                             logger.warning(f"[{symbol}] Order placement rejected by execution engine (circuit band / slippage clamp).")
                             db_write("UPDATE screener_candidates SET status = 'EXECUTION_REJECTED' WHERE id = ?", (cand_id,))
                 else:
-                    logger.info(f"[{symbol}] VETOED by Second Opinion Consensus Gate (Conviction: {conviction:.1f}/10, ML Prob: {ml_prob:.2f}).")
+                    logger.info(f"[{symbol}] VETOED by Second Opinion Consensus Gate (Conviction: {conviction:.1f}/10).")
                     db_write("UPDATE screener_candidates SET status = 'VETOED' WHERE id = ?", (cand_id,))
                     db_write("""
                         UPDATE agent_memory
@@ -652,7 +861,7 @@ def run_live_preview_pipeline():
                             rejection_reason = ?
                         WHERE symbol = ? AND memory_date = ?;
                     """, (
-                        f"Vetoed by Second Opinion Gate (Conviction: {conviction:.1f}/10, ML Prob: {ml_prob:.2f})",
+                        f"Vetoed by Second Opinion Gate (Conviction: {conviction:.1f}/10, Shadow ML Prob: {ml_prob:.4f})",
                         str(symbol),
                         today_ist.isoformat(),
                     ))

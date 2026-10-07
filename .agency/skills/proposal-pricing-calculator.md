@@ -1,5 +1,5 @@
 ---
-name: Proposal & Pricing Calculator
+name: proposal-pricing-calculator
 description: Generates a scoped Statement of Work and calculates estimated pricing based on feature breakdown.
 ---
 

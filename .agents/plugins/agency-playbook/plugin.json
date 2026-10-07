@@ -1,0 +1,31 @@
+{
+  "name": "agency-playbook",
+  "version": "2.0.0",
+  "description": "Antigravity 2.0 Multi-Agent Software Engineering OS powered by Ripwire (L0) and Laya (L1).",
+  "rules": "rules/AGENTS.md",
+  "hooks": "hooks.json",
+  "mcpConfig": "mcp_config.json",
+  "skills": [
+    "architecture-diagrammer",
+    "brand-identity-architect",
+    "business-model-analyst",
+    "client-intake-parser",
+    "client-update-generator",
+    "continuous-learner",
+    "crash-debugger",
+    "devils-advocate-critic",
+    "domain-agent-architect",
+    "legacy-project-onboarder",
+    "legal-risk-flagging",
+    "prd-discovery-agent",
+    "proposal-pricing-calculator",
+    "repowise-codebase-mapper",
+    "ripwire-laya-intelligence",
+    "senior-designer-ui",
+    "session-resumer",
+    "skillui-generator",
+    "strix-security-auditor",
+    "tech-stack-adviser",
+    "wcag-accessibility-auditor"
+  ]
+}

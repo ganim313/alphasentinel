@@ -2,8 +2,8 @@
 template_id: "27"
 phase: 2
 assigned_role: "product_design/user_researcher"
-context_from: ["01_proposal_sow.md", "13_client_intake_questionnaire.md"]
-outputs_to: ["03_requirements_engineering.md", "10_ui_ux_handoff.md"]
+context_from: ["product_design/01_proposal_sow.md", "sales_client/13_client_intake_questionnaire.md"]
+outputs_to: ["product_design/03_requirements_engineering.md", "product_design/10_ui_ux_handoff.md"]
 status: template
 ---
 # Template 27: User Personas & Customer Journey Maps
@@ -58,14 +58,24 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Primary Persona Target):** `[Core target user profile and JTBD focus]`
 * **Key Decision 2 (Aha-Moment Path):** `[Fastest user path from signup to first core value]`
 * **Key Decision 3 (Friction Mitigations):** `[Key UX solutions designed to eliminate drop-off]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -78,4 +88,4 @@ status: template
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 27_user_persona_journey.md
+- [ ] `product_design/27_user_persona_journey.md`

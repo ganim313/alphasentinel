@@ -1,5 +1,5 @@
 ---
-name: Brand Identity Architect
+name: brand-identity-architect
 description: Generates a comprehensive brand strategy (voice, positioning, messaging) for clients who lack a brand identity (inspired by arnabbagxd Brand-building-skills).
 ---
 

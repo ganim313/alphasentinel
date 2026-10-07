@@ -2,8 +2,8 @@
 template_id: "24"
 phase: 3
 assigned_role: "data_ai/ml_engineer"
-context_from: ["03_requirements_engineering.md", "04_system_design_architecture.md"]
-outputs_to: ["05_technical_sdlc_execution.md"]
+context_from: ["product_design/03_requirements_engineering.md", "engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 24: Machine Learning Model & Pipeline Architecture
@@ -47,14 +47,24 @@ Define the specific machine learning task, baseline benchmarks, and business suc
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Model Selection):** `[Chosen foundational model, fine-tuning vs. prompt-engineering approach]`
 * **Key Decision 2 (Vector / Embedding Stack):** `[Vector database, chunking strategy, and retrieval latency]`
 * **Key Decision 3 (Guardrails & Budget):** `[Safety filters, max monthly token budget, and evaluation threshold]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -67,4 +77,4 @@ Define the specific machine learning task, baseline benchmarks, and business suc
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 24_ml_model_architecture.md
+- [ ] `data_ai/24_ml_model_architecture.md`

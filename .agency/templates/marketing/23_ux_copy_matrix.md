@@ -2,8 +2,8 @@
 template_id: "23"
 phase: 4
 assigned_role: "marketing/copywriter"
-context_from: ["03_requirements_engineering.md", "10_ui_ux_handoff.md"]
-outputs_to: ["05_technical_sdlc_execution.md"]
+context_from: ["product_design/03_requirements_engineering.md", "product_design/10_ui_ux_handoff.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 23: UX Copy & Content Matrix
@@ -49,14 +49,24 @@ Define the core personality traits of the interface copy:
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Brand Tone):** `[Approved voice and tone parameters]`
 * **Key Decision 2 (Primary CTAs):** `[Core conversion button wording across funnel]`
 * **Key Decision 3 (Error Handling Copy):** `[User-friendly error recovery messages]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -69,4 +79,4 @@ Define the core personality traits of the interface copy:
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 23_ux_copy_matrix.md
+- [ ] `marketing/23_ux_copy_matrix.md`

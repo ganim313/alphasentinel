@@ -1,0 +1,224 @@
+{
+  "entries": [
+    {
+      "name": "architecture-diagrammer",
+      "path": ".agents/plugins/agency-playbook/skills/architecture-diagrammer/SKILL.md",
+      "description": "Generates system architecture, Entity-Relationship, and Sequence diagrams from a Product Requirements Document (PRD)."
+    },
+    {
+      "name": "brand-identity-architect",
+      "path": ".agents/plugins/agency-playbook/skills/brand-identity-architect/SKILL.md",
+      "description": "Generates a comprehensive brand strategy (voice, positioning, messaging) for clients who lack a brand identity (inspired by arnabbagxd Brand-building-skills)."
+    },
+    {
+      "name": "business-model-analyst",
+      "path": ".agents/plugins/agency-playbook/skills/business-model-analyst/SKILL.md",
+      "description": "Pressure-tests your own product idea from a business and commercial viability perspective before committing to building it."
+    },
+    {
+      "name": "client-intake-parser",
+      "path": ".agents/plugins/agency-playbook/skills/client-intake-parser/SKILL.md",
+      "description": "Extracts client requirements from raw meeting transcripts or emails and populates the formal Intake Questionnaire."
+    },
+    {
+      "name": "client-update-generator",
+      "path": ".agents/plugins/agency-playbook/skills/client-update-generator/SKILL.md",
+      "description": "Translates technical git commits and task completions into a polished, non-technical weekly update email for the client."
+    },
+    {
+      "name": "continuous-learner",
+      "path": ".agents/plugins/agency-playbook/skills/continuous-learner/SKILL.md",
+      "description": "Analyzes recently solved problems, bug fixes, or architecture decisions and updates the agency's skills and templates so future projects automatically get smarter."
+    },
+    {
+      "name": "crash-debugger",
+      "path": ".agents/plugins/agency-playbook/skills/crash-debugger/SKILL.md",
+      "description": "Reads production error logs and stack traces to automatically diagnose the root cause and suggest the exact code fix."
+    },
+    {
+      "name": "devils-advocate-critic",
+      "path": ".agents/plugins/agency-playbook/skills/devils-advocate-critic/SKILL.md",
+      "description": "Adversarial cross-checking skill that stress-tests and attacks code, architectures, PRDs, and contracts to uncover hidden flaws, race conditions, security vulnerabilities, and scope risks."
+    },
+    {
+      "name": "domain-agent-architect",
+      "path": ".agents/plugins/agency-playbook/skills/domain-agent-architect/SKILL.md",
+      "description": "Conducts a /grill-me one-question-at-a-time Socratic discovery interview (after scanning any Intake/PRD docs) to identify a project's domain nature and permanently materialize native project-specific domain specialist agents, Antigravity 2.0 rules, skills, Laya routing, and 7-Phase critic gates."
+    },
+    {
+      "name": "legacy-project-onboarder",
+      "path": ".agents/plugins/agency-playbook/skills/legacy-project-onboarder/SKILL.md",
+      "description": "Reverse-engineers an existing or mid-flight codebase to automatically generate the missing agency documentation (PRD, Architecture, Runbooks)."
+    },
+    {
+      "name": "legal-risk-flagging",
+      "path": ".agents/plugins/agency-playbook/skills/legal-risk-flagging/SKILL.md",
+      "description": "Audits generated contracts (MSA, SLA, SOW) to flag liabilities or over-promises before presenting to the client."
+    },
+    {
+      "name": "prd-discovery-agent",
+      "path": ".agents/plugins/agency-playbook/skills/prd-discovery-agent/SKILL.md",
+      "description": "Transforms vague client ideas or rough personal product concepts into a complete, detailed PRD through a structured Socratic interview with the AI."
+    },
+    {
+      "name": "proposal-pricing-calculator",
+      "path": ".agents/plugins/agency-playbook/skills/proposal-pricing-calculator/SKILL.md",
+      "description": "Generates a scoped Statement of Work and calculates estimated pricing based on feature breakdown."
+    },
+    {
+      "name": "repowise-codebase-mapper",
+      "path": ".agents/plugins/agency-playbook/skills/repowise-codebase-mapper/SKILL.md",
+      "description": "Uses the RepoWise tool to index and map massive legacy codebases so AI agents can understand them without blowing up their context window."
+    },
+    {
+      "name": "ripwire-laya-intelligence",
+      "path": ".agents/plugins/agency-playbook/skills/ripwire-laya-intelligence/SKILL.md",
+      "description": "Layer 0 (Ripwire v0.6.5 structural & doc-graph recall, lane planning, merge-scout, quality-delta) and Layer 1 (Laya System-1 typed task routing, rubric scoring, and scope-creep classification) intelligence skill."
+    },
+    {
+      "name": "senior-designer-ui",
+      "path": ".agents/plugins/agency-playbook/skills/senior-designer-ui/SKILL.md",
+      "description": "A persona-based skill that forces the coding agent to apply high-end, premium UI/UX principles (inspired by Owl-Listener designer skills) instead of default \"developer design\"."
+    },
+    {
+      "name": "session-resumer",
+      "path": ".agents/plugins/agency-playbook/skills/session-resumer/SKILL.md",
+      "description": "Instantly reads the active project state and deliverables to catch up a fresh AI chat on where the project left off and identify the exact next action."
+    },
+    {
+      "name": "skillui-generator",
+      "path": ".agents/plugins/agency-playbook/skills/skillui-generator/SKILL.md",
+      "description": "Uses the open-source SkillUI tool to reverse-engineer a target website's design system into a usable skill file for your agents."
+    },
+    {
+      "name": "strix-security-auditor",
+      "path": ".agents/plugins/agency-playbook/skills/strix-security-auditor/SKILL.md",
+      "description": "Orchestrates the Strix open-source AI penetration testing tool to automatically find and remediate vulnerabilities in the codebase before deployment."
+    },
+    {
+      "name": "tech-stack-adviser",
+      "path": ".agents/plugins/agency-playbook/skills/tech-stack-adviser/SKILL.md",
+      "description": "Adversarial trade-off evaluation skill that rigorously debates, challenges, and justifies technology stack selections (Frameworks, Databases, Auth, Hosting) across Velocity, Cost, Complexity, and Scalability."
+    },
+    {
+      "name": "wcag-accessibility-auditor",
+      "path": ".agents/plugins/agency-playbook/skills/wcag-accessibility-auditor/SKILL.md",
+      "description": "Audits web applications for WCAG 2.1 AA compliance, keyboard navigation, color contrast, and ARIA screen reader attributes."
+    }
+  ],
+  "skills": [
+    {
+      "name": "architecture-diagrammer",
+      "path": ".agents/plugins/agency-playbook/skills/architecture-diagrammer/SKILL.md",
+      "description": "Generates system architecture, Entity-Relationship, and Sequence diagrams from a Product Requirements Document (PRD)."
+    },
+    {
+      "name": "brand-identity-architect",
+      "path": ".agents/plugins/agency-playbook/skills/brand-identity-architect/SKILL.md",
+      "description": "Generates a comprehensive brand strategy (voice, positioning, messaging) for clients who lack a brand identity (inspired by arnabbagxd Brand-building-skills)."
+    },
+    {
+      "name": "business-model-analyst",
+      "path": ".agents/plugins/agency-playbook/skills/business-model-analyst/SKILL.md",
+      "description": "Pressure-tests your own product idea from a business and commercial viability perspective before committing to building it."
+    },
+    {
+      "name": "client-intake-parser",
+      "path": ".agents/plugins/agency-playbook/skills/client-intake-parser/SKILL.md",
+      "description": "Extracts client requirements from raw meeting transcripts or emails and populates the formal Intake Questionnaire."
+    },
+    {
+      "name": "client-update-generator",
+      "path": ".agents/plugins/agency-playbook/skills/client-update-generator/SKILL.md",
+      "description": "Translates technical git commits and task completions into a polished, non-technical weekly update email for the client."
+    },
+    {
+      "name": "continuous-learner",
+      "path": ".agents/plugins/agency-playbook/skills/continuous-learner/SKILL.md",
+      "description": "Analyzes recently solved problems, bug fixes, or architecture decisions and updates the agency's skills and templates so future projects automatically get smarter."
+    },
+    {
+      "name": "crash-debugger",
+      "path": ".agents/plugins/agency-playbook/skills/crash-debugger/SKILL.md",
+      "description": "Reads production error logs and stack traces to automatically diagnose the root cause and suggest the exact code fix."
+    },
+    {
+      "name": "devils-advocate-critic",
+      "path": ".agents/plugins/agency-playbook/skills/devils-advocate-critic/SKILL.md",
+      "description": "Adversarial cross-checking skill that stress-tests and attacks code, architectures, PRDs, and contracts to uncover hidden flaws, race conditions, security vulnerabilities, and scope risks."
+    },
+    {
+      "name": "domain-agent-architect",
+      "path": ".agents/plugins/agency-playbook/skills/domain-agent-architect/SKILL.md",
+      "description": "Conducts a /grill-me one-question-at-a-time Socratic discovery interview (after scanning any Intake/PRD docs) to identify a project's domain nature and permanently materialize native project-specific domain specialist agents, Antigravity 2.0 rules, skills, Laya routing, and 7-Phase critic gates."
+    },
+    {
+      "name": "legacy-project-onboarder",
+      "path": ".agents/plugins/agency-playbook/skills/legacy-project-onboarder/SKILL.md",
+      "description": "Reverse-engineers an existing or mid-flight codebase to automatically generate the missing agency documentation (PRD, Architecture, Runbooks)."
+    },
+    {
+      "name": "legal-risk-flagging",
+      "path": ".agents/plugins/agency-playbook/skills/legal-risk-flagging/SKILL.md",
+      "description": "Audits generated contracts (MSA, SLA, SOW) to flag liabilities or over-promises before presenting to the client."
+    },
+    {
+      "name": "prd-discovery-agent",
+      "path": ".agents/plugins/agency-playbook/skills/prd-discovery-agent/SKILL.md",
+      "description": "Transforms vague client ideas or rough personal product concepts into a complete, detailed PRD through a structured Socratic interview with the AI."
+    },
+    {
+      "name": "proposal-pricing-calculator",
+      "path": ".agents/plugins/agency-playbook/skills/proposal-pricing-calculator/SKILL.md",
+      "description": "Generates a scoped Statement of Work and calculates estimated pricing based on feature breakdown."
+    },
+    {
+      "name": "repowise-codebase-mapper",
+      "path": ".agents/plugins/agency-playbook/skills/repowise-codebase-mapper/SKILL.md",
+      "description": "Uses the RepoWise tool to index and map massive legacy codebases so AI agents can understand them without blowing up their context window."
+    },
+    {
+      "name": "ripwire-laya-intelligence",
+      "path": ".agents/plugins/agency-playbook/skills/ripwire-laya-intelligence/SKILL.md",
+      "description": "Layer 0 (Ripwire v0.6.5 structural & doc-graph recall, lane planning, merge-scout, quality-delta) and Layer 1 (Laya System-1 typed task routing, rubric scoring, and scope-creep classification) intelligence skill."
+    },
+    {
+      "name": "senior-designer-ui",
+      "path": ".agents/plugins/agency-playbook/skills/senior-designer-ui/SKILL.md",
+      "description": "A persona-based skill that forces the coding agent to apply high-end, premium UI/UX principles (inspired by Owl-Listener designer skills) instead of default \"developer design\"."
+    },
+    {
+      "name": "session-resumer",
+      "path": ".agents/plugins/agency-playbook/skills/session-resumer/SKILL.md",
+      "description": "Instantly reads the active project state and deliverables to catch up a fresh AI chat on where the project left off and identify the exact next action."
+    },
+    {
+      "name": "skillui-generator",
+      "path": ".agents/plugins/agency-playbook/skills/skillui-generator/SKILL.md",
+      "description": "Uses the open-source SkillUI tool to reverse-engineer a target website's design system into a usable skill file for your agents."
+    },
+    {
+      "name": "strix-security-auditor",
+      "path": ".agents/plugins/agency-playbook/skills/strix-security-auditor/SKILL.md",
+      "description": "Orchestrates the Strix open-source AI penetration testing tool to automatically find and remediate vulnerabilities in the codebase before deployment."
+    },
+    {
+      "name": "tech-stack-adviser",
+      "path": ".agents/plugins/agency-playbook/skills/tech-stack-adviser/SKILL.md",
+      "description": "Adversarial trade-off evaluation skill that rigorously debates, challenges, and justifies technology stack selections (Frameworks, Databases, Auth, Hosting) across Velocity, Cost, Complexity, and Scalability."
+    },
+    {
+      "name": "wcag-accessibility-auditor",
+      "path": ".agents/plugins/agency-playbook/skills/wcag-accessibility-auditor/SKILL.md",
+      "description": "Audits web applications for WCAG 2.1 AA compliance, keyboard navigation, color contrast, and ARIA screen reader attributes."
+    }
+  ],
+  "domain_skills": {
+    "domain-quant-trading-finance": {
+      "enabled": true,
+      "path": ".agents/skills/domain-quant-trading-finance/SKILL.md",
+      "description": "Project-specific domain specialist skill for Quantitative Trading & Market Execution Domain",
+      "project_domain": true
+    }
+  }
+}

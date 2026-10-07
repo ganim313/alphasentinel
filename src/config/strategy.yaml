@@ -18,7 +18,12 @@ screening:
     rs_period: 60
 
 risk:
-  max_position_size_pct: 10.0
+  max_position_size_pct: 16.0
+  max_portfolio_heat_pct: 5.0
+  risk_per_trade_pct: 1.0
+  risk_per_trade_neutral_pct: 0.5
+  max_open_positions: 6
+  max_positions_per_sector: 2
   max_adtv_participation_pct: 1.5
   adtv_participation_caps:
     LARGE: 5.0
@@ -27,13 +32,13 @@ risk:
     MICRO: 0.5
     DEFAULT: 1.5
   stop_loss:
-    atr_multiplier: 1.8
-    max_pct_drop: 5.5
+    atr_multiplier: 2.5
+    max_pct_stop: 8.0
   profit_targets:
     target_1_rr: 2.0
     target_2_rr: 3.5
   sector_exposure:
-    max_open_positions: 3
+    max_open_positions: 2
     max_portfolio_pct: 25.0
   min_conviction_score: 7.0
   daily_drawdown_halt_pct: 3.0

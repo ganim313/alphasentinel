@@ -2,8 +2,8 @@
 template_id: "31"
 phase: 7
 assigned_role: "finance_ops/finance_strategist"
-context_from: ["07_deployment_runbook.md"]
-outputs_to: []
+context_from: ["engineering/07_deployment_runbook.md"]
+outputs_to: ["finance_ops/16_final_handoff_release.md"]
 status: template
 ---
 # Template 31: Timesheet & Billable Hours Tracking
@@ -73,7 +73,30 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-1. [ ] Approved — Hours accurate and ready for invoicing
-2. [ ] Revisions Required
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
+
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Note 1: e.g., Hours reconciled and approved for final invoicing.]`
 
 **Status:** ⏳ Awaiting Approval
+
+---
+
+## Agent Handoff to Next Phase
+
+### Pre-Flight Checks
+- [ ] Deliverable has been reviewed against requirements.
+- [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Output complies with project_state.yml guidelines.
+
+### Context Package for Next Agent
+The following artifacts must be passed to the next phase:
+- [ ] `finance_ops/31_timesheet_tracking.md`

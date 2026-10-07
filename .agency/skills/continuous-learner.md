@@ -1,5 +1,5 @@
 ---
-name: Continuous Self-Learner
+name: continuous-learner
 description: Analyzes recently solved problems, bug fixes, or architecture decisions and updates the agency's skills and templates so future projects automatically get smarter.
 ---
 
@@ -22,9 +22,9 @@ This skill gives your AI engineering team **persistent procedural memory**. When
 
 1. **Extract the Core Pattern:** Identify the root cause, the exact fix applied, and the generalized engineering rule (e.g., *"When using Prisma with Supabase Connection Pooling, PgBouncer requires `?pgbouncer=true` in the connection string"*).
 2. **Identify the Target Skill or Role:** Determine which file in `.agency/` should permanently store this rule:
-   - Security flaws $\rightarrow$ `.agency/skills/strix-security-auditor.md` or `.agency/agents/08_security_auditor.md`
+   - Security flaws $\rightarrow$ `.agency/skills/strix-security-auditor.md` or `.agency/agents/engineering/security_auditor.md`
    - Crash bugs $\rightarrow$ `.agency/skills/crash-debugger.md`
-   - Database / ORM issues $\rightarrow$ `.agency/agents/06_database_engineer.md`
+   - Database / ORM issues $\rightarrow$ `.agency/agents/engineering/database_engineer.md`
    - PRD / Scope issues $\rightarrow$ `.agency/skills/prd-discovery-agent.md`
 3. **Apply Additive Knowledge Update:** Inject the new rule under a dedicated `### Learned Engineering Rules & Edge Cases` section in the target file.
 4. **Report Upgrade:** Output a clean 3-bullet summary:

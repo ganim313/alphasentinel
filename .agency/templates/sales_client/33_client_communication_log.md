@@ -3,7 +3,7 @@ template_id: "33"
 phase: 1
 assigned_role: "sales_client/account_manager"
 context_from: []
-outputs_to: []
+outputs_to: ["product_design/01_proposal_sow.md"]
 status: template
 ---
 # Template 33: Client Communication Log
@@ -43,7 +43,30 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-1. [ ] Approved — Log is complete and accurate
-2. [ ] Revisions Required
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
+
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Note 1: e.g., Client communication log verified for Phase 1 kickoff.]`
 
 **Status:** ⏳ Awaiting Approval
+
+---
+
+## Agent Handoff to Next Phase
+
+### Pre-Flight Checks
+- [ ] Deliverable has been reviewed against requirements.
+- [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Output complies with project_state.yml guidelines.
+
+### Context Package for Next Agent
+The following artifacts must be passed to the next phase:
+- [ ] `sales_client/33_client_communication_log.md`

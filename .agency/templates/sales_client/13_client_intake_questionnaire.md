@@ -1,9 +1,9 @@
 ---
 template_id: "13"
 phase: 1
-assigned_role: "01_product_manager"
+assigned_role: "sales_client/business_development_rep"
 context_from: []
-outputs_to: ["01_proposal_sow.md"]
+outputs_to: ["product_design/01_proposal_sow.md"]
 status: template
 ---
 # Template 13: Client Intake Questionnaire
@@ -40,6 +40,17 @@ status: template
   - [ ] $15,000 - $50,000
   - [ ] $50,000+
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 intake qualification findings and wait for the human lead's explicit approval before drafting the SOW.)*
+
+* **Key Decision 1 (Lead Qualification & Budget):** `[Confirmed decision-maker authority and validated budget range >= $5,000]`
+* **Key Decision 2 (Core Problem & Must-Haves):** `[Top 3 must-have MVP features extracted from client intake]`
+* **Key Decision 3 (Clarification & Risk Register):** `[Unresolved questions flagged for follow-up prior to fixed-bid quoting]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -48,6 +59,7 @@ status: template
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

@@ -1,5 +1,5 @@
 ---
-name: RepoWise Codebase Mapper
+name: repowise-codebase-mapper
 description: Uses the RepoWise tool to index and map massive legacy codebases so AI agents can understand them without blowing up their context window.
 ---
 

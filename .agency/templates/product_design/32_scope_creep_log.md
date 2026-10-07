@@ -2,7 +2,7 @@
 template_id: "32"
 phase: 4
 assigned_role: "product_design/product_manager"
-context_from: ["03_requirements_engineering.md"]
+context_from: ["product_design/03_requirements_engineering.md"]
 outputs_to: ["finance_ops/14_change_order_form.md"]
 status: template
 ---
@@ -43,7 +43,30 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-1. [ ] Approved — All creep items documented and billed/deferred correctly
-2. [ ] Revisions Required
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
+
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Note 1: e.g., All scope creep items classified via Laya Scope Creep Classifier and converted to Change Orders.]`
 
 **Status:** ⏳ Awaiting Approval
+
+---
+
+## Agent Handoff to Next Phase
+
+### Pre-Flight Checks
+- [ ] Deliverable has been reviewed against requirements.
+- [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Output complies with project_state.yml guidelines.
+
+### Context Package for Next Agent
+The following artifacts must be passed to the next phase:
+- [ ] `product_design/32_scope_creep_log.md`

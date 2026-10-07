@@ -1,8 +1,8 @@
 ---
 template_id: "08"
 phase: 7
-assigned_role: "10_legal_operations_officer"
-context_from: ["07_deployment_runbook.md"]
+assigned_role: "finance_ops/legal_operations_officer"
+context_from: ["engineering/07_deployment_runbook.md"]
 outputs_to: []
 status: template
 ---
@@ -33,6 +33,17 @@ If the client pays for the premium retainer, guarantee response times:
 * **Severity 2 (Core Feature Broken but system online):** Guaranteed response within 12 hours.
 * **Severity 3 (Minor UI bug):** Guaranteed response within 48 business hours.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 SLA & retainer parameters and wait for the human lead's explicit approval before finalizing handoff.)*
+
+* **Key Decision 1 (Warranty Window):** `[Confirmed 14-day or 30-day bug-fix-only warranty window]`
+* **Key Decision 2 (Retainer Pricing & Hours):** `[Monthly MRR retainer fee and capped monthly tweak hours without rollover]`
+* **Key Decision 3 (SLA Response Commitments):** `[Severity 1/2/3 response SLAs tied strictly to active paid retainer]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -41,6 +52,7 @@ If the client pays for the premium retainer, guarantee response times:
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

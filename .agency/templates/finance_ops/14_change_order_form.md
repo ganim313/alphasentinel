@@ -1,9 +1,9 @@
 ---
 template_id: "14"
 phase: 2
-assigned_role: "01_product_manager"
-context_from: []
-outputs_to: ["03_requirements_engineering.md"]
+assigned_role: "product_design/product_manager"
+context_from: ["product_design/01_proposal_sow.md", "product_design/32_scope_creep_log.md"]
+outputs_to: ["product_design/03_requirements_engineering.md"]
 status: template
 ---
 # Template 14: Change Order Form
@@ -39,6 +39,17 @@ By signing below, the Client approves the additional cost and timeline extension
 *(Signature of Client)* 
 *(Signature of Agency)*
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 change-order impact decisions and wait for the human lead's explicit approval before updating the PRD.)*
+
+* **Key Decision 1 (Out-of-Scope Classification):** `[Confirmed requested feature is outside signed SOW/PRD scope]`
+* **Key Decision 2 (Timeline Extension):** `[Approved business day extension added to target delivery date]`
+* **Key Decision 3 (Commercial Fee & Pre-Payment):** `[Confirmed additional hours, hourly rate, and payment-before-work gate]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -47,6 +58,7 @@ By signing below, the Client approves the additional cost and timeline extension
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

@@ -2,8 +2,8 @@
 template_id: "26"
 phase: 1
 assigned_role: "finance_ops/finance_strategist"
-context_from: ["01_proposal_sow.md", "13_client_intake_questionnaire.md"]
-outputs_to: ["02_msa_contract.md"]
+context_from: ["product_design/01_proposal_sow.md", "sales_client/13_client_intake_questionnaire.md"]
+outputs_to: ["finance_ops/02_msa_contract.md"]
 status: template
 ---
 # Template 26: Financial Pricing & Burn Rate Model
@@ -59,14 +59,24 @@ Total Estimated Effort: 240 Hours
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Gross Margin):** `[Confirmed gross profit margin target (>= 35%)]`
 * **Key Decision 2 (Milestone Structure):** `[Agreement on 30/30/30/10 milestone payment triggers]`
 * **Key Decision 3 (Client COGS Pass-through):** `[Explicit agreement that client provides cloud/API billing credentials]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -79,4 +89,4 @@ Total Estimated Effort: 240 Hours
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 26_financial_pricing_model.md
+- [ ] `finance_ops/26_financial_pricing_model.md`

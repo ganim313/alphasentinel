@@ -4,6 +4,7 @@ from src.screening.vcp_screener import evaluate_minervini_vcp_pattern, evaluate_
 from src.screening.anti_trap_shield import evaluate_anti_trap_shield
 from src.screening.ml_predictor import evaluate_ml_probability
 from src.screening.mean_reversion_screener import evaluate_mean_reversion, evaluate_mean_reversion_batch
+from src.screening.regime_engine import compute_market_regime, get_current_regime, RegimeState
 
 __all__ = [
     "check_liquidity_and_executability",
@@ -13,5 +14,8 @@ __all__ = [
     "evaluate_anti_trap_shield",
     "evaluate_ml_probability",
     "evaluate_mean_reversion",
-    "evaluate_mean_reversion_batch"
+    "evaluate_mean_reversion_batch",
+    "compute_market_regime",
+    "get_current_regime",
+    "RegimeState",
 ]

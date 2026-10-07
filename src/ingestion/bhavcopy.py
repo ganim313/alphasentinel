@@ -75,8 +75,9 @@ def ingest_bhavcopy_dataframe(df: pd.DataFrame, trade_date: date) -> int:
         except ValueError:
             return None
 
-    # Pre-fetch previous day close prices in a single batch query to prevent N+1 connection overhead
+    # Pre-fetch previous day close prices and corporate actions in a single batch query
     prev_close_map = {}
+    approved_corp_actions = set()
     try:
         with get_read_connection() as conn:
             prior_rows = conn.execute("""
@@ -85,12 +86,20 @@ def ingest_bhavcopy_dataframe(df: pd.DataFrame, trade_date: date) -> int:
                 WHERE trade_date = (SELECT MAX(trade_date) FROM bhavcopy_daily WHERE trade_date < ?)
             """, (trade_date,)).fetchall()
             prev_close_map = {r[0]: float(r[1]) for r in prior_rows if r[1] is not None}
+            
+            # Pre-fetch corporate actions for this trade_date window (+/- 5 days)
+            ca_rows = conn.execute("""
+                SELECT DISTINCT symbol FROM corporate_actions
+                WHERE ABS(CAST(? AS DATE) - CAST(ex_date AS DATE)) <= 5
+            """, (trade_date,)).fetchall()
+            approved_corp_actions = {r[0] for r in ca_rows}
     except Exception as e:
-        logger.warning(f"Could not batch pre-fetch prior closes: {e}")
+        logger.warning(f"Could not batch pre-fetch prior closes/corporate actions: {e}")
 
     param_list = []
+    quarantine_records = []
     
-    for _, row in df.iterrows():
+    for row in df.to_dict('records'):
         symbol = str(row["SYMBOL"]).strip()
         series = str(row.get("SERIES", "EQ")).strip()
         if series not in ["EQ", "BE", "SM"]:
@@ -132,16 +141,41 @@ def ingest_bhavcopy_dataframe(df: pd.DataFrame, trade_date: date) -> int:
         deliv_q = row.get("DELIV_QTY") if row.get("DELIV_QTY") is not None else row.get("delivery_qty")
         deliv_p = row.get("DELIV_PER") if row.get("DELIV_PER") is not None else row.get("delivery_pct")
 
+        close_price = safe_float(row.get("CLOSE"))
+        
+        # >25% Price Jump Quarantine Tripwire (Requirement R5)
+        if prev_close is not None and prev_close > 0 and close_price is not None and close_price > 0:
+            pct_jump = (close_price - prev_close) / prev_close
+            if abs(pct_jump) > 0.25:
+                if symbol not in approved_corp_actions:
+                    quarantine_records.append((symbol, trade_date, prev_close, close_price, pct_jump, "UNEXPLAINED_PRICE_JUMP_GT_25PCT"))
+
         params = (
             symbol, trade_date, series,
             safe_float(row.get("OPEN")), safe_float(row.get("HIGH")),
-            safe_float(row.get("LOW")), safe_float(row.get("CLOSE")),
+            safe_float(row.get("LOW")), close_price,
             prev_close, safe_int(row.get("TOTTRDQTY")),
             safe_float(row.get("TOTTRDVAL")), safe_int(deliv_q) or 0,
             safe_float(deliv_p) or 0.0, 1.0,
             upper, lower, band, False, False
         )
         param_list.append(params)
+
+    # Batch write quarantined stocks if tripwire triggered
+    if quarantine_records:
+        ensure_quarantined_stocks_table()
+        from src.db.queue_writer import db_write_many
+        quarantine_query = """
+        INSERT OR REPLACE INTO quarantined_stocks (
+            symbol, trade_date, prev_close, close_price, pct_jump, reason, quarantined_at
+        ) VALUES (?, ?, ?, ?, ?, ?, now());
+        """
+        db_write_many(quarantine_query, quarantine_records)
+        for q_sym, q_dt, q_prev, q_cls, q_jump, _ in quarantine_records:
+            logger.warning(
+                f"🚨 QUARANTINE TRIPWIRE TRIGGERED: Symbol '{q_sym}' on {q_dt} quarantined. "
+                f"Unexplained price jump: {q_jump * 100:+.2f}% (prev_close={q_prev:.2f}, close={q_cls:.2f})."
+            )
 
     if param_list:
         from src.db.queue_writer import db_write_many
@@ -165,6 +199,179 @@ def ingest_bhavcopy_dataframe(df: pd.DataFrame, trade_date: date) -> int:
     apply_pending_corporate_actions()
     
     return rows_inserted
+
+
+def ensure_quarantined_stocks_table() -> None:
+    """Ensures the quarantined_stocks table exists in DuckDB."""
+    from src.db.queue_writer import db_write
+    query = """
+    CREATE TABLE IF NOT EXISTS quarantined_stocks (
+        symbol VARCHAR NOT NULL,
+        trade_date DATE NOT NULL,
+        prev_close DOUBLE NOT NULL,
+        close_price DOUBLE NOT NULL,
+        pct_jump DOUBLE NOT NULL,
+        reason VARCHAR DEFAULT 'UNEXPLAINED_PRICE_JUMP_GT_25PCT',
+        quarantined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (symbol, trade_date)
+    );
+    """
+    try:
+        db_write(query, sync=True)
+    except Exception as e:
+        logger.warning(f"Could not ensure quarantined_stocks table: {e}")
+
+
+def has_approved_corporate_action(symbol: str, trade_date: date, window_days: int = 5) -> bool:
+    """
+    Checks if an approved entry exists in table corporate_actions for this symbol on or near this date
+    (within +/- window_days calendar days).
+    """
+    try:
+        with get_read_connection() as conn:
+            row = conn.execute("""
+                SELECT COUNT(*) FROM corporate_actions
+                WHERE symbol = ? 
+                  AND ABS(CAST(? AS DATE) - CAST(ex_date AS DATE)) <= ?
+            """, (symbol, trade_date, window_days)).fetchone()
+            return bool(row and row[0] > 0)
+    except Exception as e:
+        logger.error(f"Error checking corporate actions for {symbol} on {trade_date}: {e}")
+        return False
+
+
+def quarantine_symbol(
+    symbol: str, 
+    trade_date: date, 
+    prev_close: float, 
+    close_price: float, 
+    pct_jump: float, 
+    reason: str = "UNEXPLAINED_PRICE_JUMP_GT_25PCT"
+) -> None:
+    """
+    Quarantines a symbol for an unexplained price jump > 25% by inserting a record into quarantined_stocks.
+    """
+    ensure_quarantined_stocks_table()
+    from src.db.queue_writer import db_write
+    query = """
+    INSERT OR REPLACE INTO quarantined_stocks (
+        symbol, trade_date, prev_close, close_price, pct_jump, reason, quarantined_at
+    ) VALUES (?, ?, ?, ?, ?, ?, now());
+    """
+    try:
+        db_write(query, (symbol, trade_date, prev_close, close_price, pct_jump, reason), sync=True)
+        logger.warning(
+            f"🚨 QUARANTINE TRIPWIRE TRIGGERED: Symbol '{symbol}' on {trade_date} quarantined. "
+            f"Unexplained price jump: {pct_jump * 100:+.2f}% (prev_close={prev_close:.2f}, close={close_price:.2f})."
+        )
+        try:
+            from src.config.settings import settings
+            if settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID:
+                from src.notification.telegram_bot import send_telegram_alert
+                send_telegram_alert(
+                    f"🚨 <b>QUARANTINE TRIPWIRE TRIGGERED</b>\n"
+                    f"Symbol: <code>{symbol}</code>\n"
+                    f"Trade Date: {trade_date}\n"
+                    f"Prev Close: ₹{prev_close:.2f} ➔ Close: ₹{close_price:.2f}\n"
+                    f"Price Jump: <b>{pct_jump * 100:+.2f}%</b>\n"
+                    f"Action: Quarantined from screening until corporate action is verified."
+                )
+        except Exception:
+            pass
+    except Exception as e:
+        logger.error(f"Failed to record quarantine for {symbol} on {trade_date}: {e}")
+
+
+def is_stock_quarantined(symbol: str, as_of_date: Optional[date] = None) -> bool:
+    """
+    Checks if a symbol is currently quarantined.
+    If as_of_date is provided, checks if quarantined on or before that date.
+    """
+    try:
+        with get_read_connection() as conn:
+            if as_of_date:
+                row = conn.execute("""
+                    SELECT COUNT(*) FROM quarantined_stocks
+                    WHERE symbol = ? AND trade_date <= ?
+                """, (symbol, as_of_date)).fetchone()
+            else:
+                row = conn.execute("""
+                    SELECT COUNT(*) FROM quarantined_stocks
+                    WHERE symbol = ?
+                """, (symbol,)).fetchone()
+            return bool(row and row[0] > 0)
+    except Exception as e:
+        logger.error(f"Error checking quarantine status for {symbol}: {e}")
+        return False
+
+
+def get_quarantined_stocks() -> list:
+    """Returns all currently quarantined stocks."""
+    try:
+        with get_read_connection() as conn:
+            rows = conn.execute("""
+                SELECT symbol, trade_date, prev_close, close_price, pct_jump, reason, quarantined_at
+                FROM quarantined_stocks
+                ORDER BY trade_date DESC, symbol ASC
+            """).fetchall()
+            return [
+                {
+                    "symbol": r[0],
+                    "trade_date": r[1],
+                    "prev_close": r[2],
+                    "close_price": r[3],
+                    "pct_jump": r[4],
+                    "reason": r[5],
+                    "quarantined_at": r[6]
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching quarantined stocks: {e}")
+        return []
+
+
+def validate_and_quarantine_bhavcopy_jumps(trade_date: Optional[date] = None) -> list:
+    """
+    Scans bhavcopy_daily for >25% price jumps.
+    For each jump, checks if an approved corporate action exists.
+    If unexplained, quarantines the symbol.
+    Returns list of newly quarantined records.
+    """
+    ensure_quarantined_stocks_table()
+    quarantined = []
+    try:
+        with get_read_connection() as conn:
+            if trade_date:
+                query = """
+                    SELECT symbol, trade_date, prev_close, close_price,
+                           (close_price - prev_close) / prev_close AS pct_jump
+                    FROM bhavcopy_daily
+                    WHERE trade_date = ? AND prev_close > 0 AND ABS((close_price - prev_close) / prev_close) > 0.25
+                """
+                rows = conn.execute(query, (trade_date,)).fetchall()
+            else:
+                query = """
+                    SELECT symbol, trade_date, prev_close, close_price,
+                           (close_price - prev_close) / prev_close AS pct_jump
+                    FROM bhavcopy_daily
+                    WHERE prev_close > 0 AND ABS((close_price - prev_close) / prev_close) > 0.25
+                """
+                rows = conn.execute(query).fetchall()
+
+        for sym, dt, prev, cls, jump in rows:
+            if not has_approved_corporate_action(sym, dt):
+                quarantine_symbol(sym, dt, prev, cls, jump)
+                quarantined.append({
+                    "symbol": sym,
+                    "trade_date": dt,
+                    "prev_close": prev,
+                    "close_price": cls,
+                    "pct_jump": jump
+                })
+    except Exception as e:
+        logger.error(f"Error validating and quarantining bhavcopy jumps: {e}")
+    return quarantined
 
 def fetch_bhavcopy_with_retry_and_fallback(trade_date: date, max_retries: int = 3) -> Optional[pd.DataFrame]:
     """

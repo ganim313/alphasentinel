@@ -1,56 +1,50 @@
-# 🚨 Scenario Runbook: Emergency Incident Response (P0 Outage / Crash)
+# 🚨 Runbook: Emergency Incident Response & Urgent Bugfix (SEV-1 / SEV-2)
 
-**Objective:** Rapidly diagnose, isolate, fix, test, and deploy emergency patches for critical production outages, data corruption, or unhandled crash loops.
-
----
-
-## 👥 Assigned Agent Squad
-
-| Role | Agent File | Primary Mission |
-| :--- | :--- | :--- |
-| **DevOps & SRE Lead** | `@09_devops_sre_engineer.md` | Contain the blast radius, rollback if necessary, and inspect logs |
-| **Crash Debugger** | `@crash-debugger.md` | Perform root-cause analysis on stack traces and error payloads |
-| **Security Auditor** | `@08_security_auditor.md` | Verify the incident is not an active exploitation or zero-day breach |
-| **Master Critic** | `@master_critic.md` | Stress-test the proposed patch for unintended regressions |
+**Trigger:** Production system is down, experiencing severe 500 crashes, or suffering an active security incident (`entry_mode: "urgent_bugfix"`).
+**Objective:** Restore service (MTTR minimization) safely, prevent data corruption, and document root cause without bureaucratic delay.
 
 ---
 
-## ⚡ 4-Stage Triage Flow
+## ⚡ Phase 0: Immediate Triage (Minutes 0–15)
+**Active Role:** `@.agency/agents/engineering/devops_sre_engineer.md` (Incident Commander)
+**Support Role:** `@.agency/agents/engineering/backend_engineer.md`
 
-```mermaid
-flowchart TD
-    T1["Stage 1: Containment & Blast Radius<br/>(Rollback / Maintenance Mode)"] --> T2["Stage 2: Root-Cause Forensics<br/>(@crash-debugger & @09_devops)"]
-    T2 --> T3["Stage 3: Surgical Patch & Red-Team<br/>(@master_critic & @08_security)"]
-    T3 --> T4["Stage 4: Hotfix Deploy & Post-Mortem<br/>(12_project_post_mortem.md)"]
-```
-
-### Stage 1: Immediate Containment (Minutes 0–15)
-1. Assess system availability: Can traffic be rerouted, or is a rollback to the previous stable release required?
-2. If database is involved, immediately trigger point-in-time backup.
-
-### Stage 2: Root-Cause Diagnosis (Minutes 15–45)
-1. Provide error stack trace, Sentry link, or cloud logs to the agent:
-   > *"Run `@crash-debugger.md` on this error log: [PASTE STACK TRACE]. Identify the exact failing file, line number, and triggering edge case."*
-2. Isolate whether the issue is:
-   - Null pointer / unhandled promise rejection
-   - Database connection pool exhaustion / deadlock
-   - Third-party API outage / timeout
-   - Corrupted state / invalid payload
-
-### Stage 3: Surgical Hotfix & Adversarial Review (Minutes 45–75)
-1. Generate the minimal surgical patch (no broad refactoring during an outage):
-   > *"Draft a targeted hotfix for [file]. Ensure graceful fallbacks and timeout guards."*
-2. Red-Team the fix:
-   > *"Act as `@master_critic.md`. Audit this hotfix to prove whether it can cause secondary side effects or performance regressions under high concurrency."*
-
-### Stage 4: Hotfix Deployment & Post-Mortem (Minutes 75–120)
-1. Deploy hotfix to production.
-2. Monitor error tracking dashboard for 15 minutes to verify error rate returns to 0%.
-3. Document the incident in `.agency/active/product_design/12_project_post_mortem.md`.
+1. **Declare Incident:** Open a dedicated Incident Channel and start a live timeline in `.agency/templates/product_design/12_project_post_mortem.md`.
+2. **Assess Blast Radius via Ripwire Layer 0:**
+   - Read `@.agency/skills/crash-debugger/SKILL.md`.
+   - Run `python .agency/scripts/ripwire_engine.py --from-trace "<stack_trace_or_error>"` and `--recall "<symbol>"` to locate exact fault symbols and blast-radius callers.
+3. **The 5-Minute Rollback Rule:**
+   - Did a deployment, config change, or feature flag toggle occur in the last 2 hours?
+   - **YES:** Execute an immediate rollback per `.agency/templates/engineering/07_deployment_runbook.md`.
+   - **NO:** Proceed to Phase 1 (Containment).
 
 ---
 
-## ✅ Definition of Done (DoD)
-1. Production error rate returns to baseline (`< 0.01%`).
-2. Automated regression test added to prevent recurrence of this exact error scenario.
-3. Post-mortem document completed with timeline, root cause, and 3 preventive action items.
+## 🛡️ Phase 1: Containment & Surgical Hotfix (Minutes 15–60)
+**Active Role:** `@.agency/agents/engineering/backend_engineer.md` & `@.agency/agents/engineering/security_auditor.md`
+
+1. **Shed Load / Isolate Fault:**
+   - Enable rate-limiting, block malicious IPs at the WAF, or disable the failing queue consumer via feature flag.
+2. **Database Protection (`@.agency/agents/engineering/database_engineer.md`):**
+   - Terminate runaway queries (`pg_terminate_backend`). Never run destructive queries without a snapshot.
+3. **Draft Surgical Hotfix:**
+   - Write the minimum viable patch in `.agency/templates/engineering/05_technical_sdlc_execution.md`.
+   - Run `python .agency/scripts/ripwire_engine.py --edit-check <file>` and `python .agency/scripts/laya_engine.py --screen-code <file>` to ensure the hotfix introduces zero regressions.
+   - Invoke `@.agency/agents/oversight/code_integrity_guardian.md` and `@.agency/agents/oversight/master_critic.md` for an expedited review.
+
+---
+
+## 🔍 Phase 2: Verification & Recovery
+**Active Role:** `@.agency/agents/engineering/qa_sdet_engineer.md`
+
+1. **Regression Test:** Add an automated regression test reproducing the exact stack trace in `.agency/templates/engineering/06_testing_uat_signoff.md`.
+2. **Verify Metrics:** Confirm error rates and latency have returned to baseline for at least 15 consecutive minutes.
+
+---
+
+## 📝 Phase 3: Blameless Post-Mortem (Within 24–48 Hours)
+**Active Role:** `@.agency/agents/engineering/devops_sre_engineer.md`
+**Critic Gate:** `@.agency/agents/oversight/master_critic.md`
+
+1. Complete `.agency/templates/product_design/12_project_post_mortem.md`.
+2. Run `python .agency/scripts/laya_engine.py --score-deliverable .agency/templates/product_design/12_project_post_mortem.md` and obtain **Human Lead Sign-Off**.

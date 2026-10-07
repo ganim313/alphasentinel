@@ -1,9 +1,9 @@
 ---
 template_id: "02"
 phase: 1
-assigned_role: "10_legal_operations_officer"
-context_from: ["01_proposal_sow.md"]
-outputs_to: ["03_requirements_engineering.md"]
+assigned_role: "finance_ops/legal_operations_officer"
+context_from: ["product_design/01_proposal_sow.md"]
+outputs_to: ["product_design/03_requirements_engineering.md"]
 status: template
 ---
 # Template 02: Master Services Agreement (MSA)
@@ -32,6 +32,17 @@ Developer provides the software "as-is" upon final delivery. Developer is not li
 
 *(Signatures of both parties)*
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 legal & commercial terms and wait for the human lead's explicit approval before proceeding to Requirements.)*
+
+* **Key Decision 1 (IP Transfer Gate):** `[Confirmed IP ownership remains with Agency until 100% of final payment clears]`
+* **Key Decision 2 (Payment & Late Terms):** `[Net-15 invoice schedule, 30/30/30/10 milestones, and 5% late fee clause]`
+* **Key Decision 3 (Liability Cap):** `[Limitation of liability capped at total contract value; zero consequential damages]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -40,6 +51,7 @@ Developer provides the software "as-is" upon final delivery. Developer is not li
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

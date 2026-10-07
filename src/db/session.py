@@ -76,6 +76,16 @@ def init_db() -> None:
                     conn.execute("ALTER TABLE positions ADD COLUMN peak_high DOUBLE;")
                 if "candidate_id" not in pos_existing_cols:
                     conn.execute("ALTER TABLE positions ADD COLUMN candidate_id VARCHAR;")
+                if "settlement_status" not in pos_existing_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN settlement_status VARCHAR DEFAULT 'SETTLING_T0_T1';")
+                if "can_exit" not in pos_existing_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN can_exit BOOLEAN DEFAULT FALSE;")
+                if "gtt_placed" not in pos_existing_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN gtt_placed BOOLEAN DEFAULT FALSE;")
+                if "gtt_placed_at" not in pos_existing_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN gtt_placed_at TIMESTAMPTZ;")
+                if "purification_due_inr" not in pos_existing_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN purification_due_inr DOUBLE DEFAULT 0.0;")
                 
             # Non-destructive migrations for bhavcopy_daily
             bhav_cols_info = conn.execute("PRAGMA table_info('bhavcopy_daily')").fetchall()
@@ -182,6 +192,19 @@ def init_db() -> None:
                     strategy_name VARCHAR NOT NULL,
                     parameters_hash VARCHAR UNIQUE NOT NULL,
                     parameters_json TEXT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            # Migration 003: Non-destructive migration for guardian_log table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS guardian_log (
+                    id VARCHAR PRIMARY KEY,
+                    timestamp TIMESTAMPTZ,
+                    symbol VARCHAR,
+                    action VARCHAR,
+                    rule VARCHAR,
+                    details JSON,
                     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                 );
             """)

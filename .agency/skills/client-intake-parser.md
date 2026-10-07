@@ -1,5 +1,5 @@
 ---
-name: Client Intake Parser
+name: client-intake-parser
 description: Extracts client requirements from raw meeting transcripts or emails and populates the formal Intake Questionnaire.
 ---
 

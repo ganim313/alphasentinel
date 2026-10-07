@@ -1,5 +1,5 @@
 ---
-name: Legal Risk Flagger
+name: legal-risk-flagging
 description: Audits generated contracts (MSA, SLA, SOW) to flag liabilities or over-promises before presenting to the client.
 ---
 

@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "ripwire": {
+      "command": "ripwire",
+      "args": [
+        ".",
+        "--mcp"
+      ],
+      "env": {
+        "RIPWIRE_INDEX_MARKDOWN": "1",
+        "RIPWIRE_VERSION": "0.6.5"
+      }
+    },
+    "laya": {
+      "command": "laya-mcp-server",
+      "args": [],
+      "env": {
+        "LAYA_MODEL_TIER": "system1-fast",
+        "LAYA_MULTILINGUAL": "1"
+      }
+    }
+  }
+}

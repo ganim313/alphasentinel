@@ -1,5 +1,5 @@
 ---
-name: Business Model Analyst
+name: business-model-analyst
 description: Pressure-tests your own product idea from a business and commercial viability perspective before committing to building it.
 ---
 

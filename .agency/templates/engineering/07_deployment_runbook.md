@@ -1,9 +1,9 @@
 ---
 template_id: "07"
 phase: 6
-assigned_role: "09_devops_sre_engineer"
-context_from: ["05_technical_sdlc_execution.md", "06_testing_uat_signoff.md"]
-outputs_to: ["08_post_launch_sla.md", "16_final_handoff_release.md"]
+assigned_role: "engineering/devops_sre_engineer"
+context_from: ["engineering/05_technical_sdlc_execution.md", "engineering/06_testing_uat_signoff.md"]
+outputs_to: ["finance_ops/08_post_launch_sla.md", "finance_ops/16_final_handoff_release.md"]
 status: template
 ---
 # Template 07: Deployment Runbook & Handoff

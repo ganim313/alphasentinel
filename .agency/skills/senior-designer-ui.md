@@ -1,5 +1,5 @@
 ---
-name: Senior Designer UI
+name: senior-designer-ui
 description: A persona-based skill that forces the coding agent to apply high-end, premium UI/UX principles (inspired by Owl-Listener designer skills) instead of default "developer design".
 ---
 

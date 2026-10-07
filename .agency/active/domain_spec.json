@@ -1,0 +1,182 @@
+{
+  "project_name": "AlphaSentinel",
+  "domain_slug": "quant_trading_finance",
+  "domain_title": "Quantitative Trading & Market Execution Domain",
+  "domain_summary": "AlphaSentinel: Institutional quantitative trading operating system for Indian Mid-Cap, Small-Cap, and Micro-Cap equities on NSE",
+  "interview_mode": "grill-me",
+  "specialists": [
+    {
+      "agent_id": "DOM-01",
+      "slug": "quantitative_researcher",
+      "role_name": "Principal Quantitative Researcher & Alpha Strategist",
+      "is_domain_critic": false,
+      "phases": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "co_owned_deliverables": [
+        "product_design/03_requirements_engineering.md",
+        "data_ai/24_ml_model_architecture.md",
+        "data_ai/25_data_analytics_dashboard.md"
+      ],
+      "routing_keywords": [
+        "quant",
+        "alpha",
+        "signal",
+        "factor",
+        "backtest",
+        "sharpe",
+        "sortino",
+        "mean reversion",
+        "momentum",
+        "statistical arbitrage",
+        "walk forward",
+        "regime",
+        "strategy",
+        "alphasentinel",
+        "institutional",
+        "quantitative",
+        "trading",
+        "operating",
+        "indian"
+      ],
+      "mission": "Design alpha signals, factor models, regime-detection filters, and walk-forward backtesting pipelines with zero lookahead or survivorship bias.",
+      "heuristics": [
+        "Enforce strict point-in-time (PIT) data alignment so no future bar or corporate action leaks into historical signals.",
+        "Evaluate strategies on net-of-cost Sharpe, Sortino, Calmar, turnover, and parameter stability across market regimes.",
+        "Model realistic transaction costs (brokerage, exchange fees, taxes/STT, and borrow rates) inside every backtest."
+      ]
+    },
+    {
+      "agent_id": "DOM-02",
+      "slug": "market_microstructure_specialist",
+      "role_name": "Market Microstructure & Order Execution Specialist",
+      "is_domain_critic": false,
+      "phases": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "co_owned_deliverables": [
+        "engineering/04_system_design_architecture.md",
+        "engineering/05_technical_sdlc_execution.md",
+        "engineering/06_testing_uat_signoff.md"
+      ],
+      "routing_keywords": [
+        "order book",
+        "lob",
+        "slippage",
+        "execution",
+        "twap",
+        "vwap",
+        "bid ask",
+        "spread",
+        "latency",
+        "websocket",
+        "fix protocol",
+        "matching engine",
+        "order routing",
+        "tick data",
+        "alphasentinel",
+        "institutional",
+        "quantitative",
+        "trading",
+        "operating",
+        "indian"
+      ],
+      "mission": "Architect low-latency market data ingestion, limit order book (LOB) state machines, slippage simulation, and idempotent order execution lifecycles.",
+      "heuristics": [
+        "Enforce deterministic order state transitions (NEW -> PARTIALLY_FILLED -> FILLED / CANCELED / REJECTED) with idempotency keys.",
+        "Handle out-of-order WebSocket ticks, sequence gaps, and exchange rate-limits with automatic snapshot reconciliation.",
+        "Simulate partial fills, queue position, and bid-ask spread widening during high-volatility spikes."
+      ]
+    },
+    {
+      "agent_id": "DOM-03",
+      "slug": "portfolio_risk_strategist",
+      "role_name": "Portfolio Risk, VaR & Capital Allocation Strategist",
+      "is_domain_critic": false,
+      "phases": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "co_owned_deliverables": [
+        "finance_ops/26_financial_pricing_model.md",
+        "engineering/09_security_compliance.md",
+        "engineering/17_disaster_recovery_bcp.md"
+      ],
+      "routing_keywords": [
+        "risk",
+        "var",
+        "cvar",
+        "drawdown",
+        "kelly",
+        "position sizing",
+        "margin",
+        "leverage",
+        "kill switch",
+        "circuit breaker",
+        "exposure",
+        "stop loss",
+        "greeks",
+        "alphasentinel",
+        "institutional",
+        "quantitative",
+        "trading",
+        "operating",
+        "indian"
+      ],
+      "mission": "Govern pre-trade and real-time risk controls, Value-at-Risk (VaR/CVaR), position sizing, margin utilization, and automated drawdown circuit breakers.",
+      "heuristics": [
+        "Enforce hard pre-trade fat-finger checks: max order notional, max position concentration, and max daily loss limits.",
+        "Require a hardware/process-isolated Kill Switch capable of canceling all open orders and flattening exposure in <2 seconds.",
+        "Stress-test portfolio correlation breakdown under 5-sigma liquidity shocks."
+      ]
+    },
+    {
+      "agent_id": "DOM-04",
+      "slug": "financial_regulatory_critic",
+      "role_name": "Quant Overfitting, Tail-Risk & Regulatory Compliance Critic",
+      "is_domain_critic": true,
+      "phases": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "co_owned_deliverables": [
+        "product_design/03_requirements_engineering.md",
+        "engineering/04_system_design_architecture.md",
+        "engineering/09_security_compliance.md"
+      ],
+      "routing_keywords": [
+        "overfitting",
+        "lookahead bias",
+        "regulatory compliance",
+        "sebi",
+        "sec",
+        "audit trail",
+        "trading critic",
+        "tail risk"
+      ],
+      "mission": "Adversarially audit all trading algorithms, execution pipelines, and risk engines for data leakage, curve-fitting, duplicate order submission bugs, and regulatory non-compliance.",
+      "heuristics": [
+        "Block any backtest or model that lacks out-of-sample walk-forward validation or ignores bid-ask slippage.",
+        "Block any order-placement path that lacks pre-trade risk limit checks and immutable audit logging.",
+        "Verify floating-point arithmetic is never used for monetary ledger balances or order prices (require Decimal/integer ticks)."
+      ]
+    }
+  ]
+}

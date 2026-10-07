@@ -1,7 +1,7 @@
 # Windsurf Cascade Rules — Agency Playbook Operating System
 
 1. Project State: Active tracking file is located at `.agency/active/project_state.yml`.
-2. Architecture Contract: Code must match OpenAPI schemas in `.agency/active/engineering/04_system_design_architecture.md`.
-3. Quality Gate: No placeholder tokens `[TBD]`, `[TODO]`, or empty stubs in deliverables.
-4. Validation: Verify phase completion with `python .agency/scripts/validate_phase.py`.
-5. Error Handling: When encountering build/runtime errors, run `@crash-debugger.md` to analyze root cause.
+2. Layer 0 Context: Run `python .agency/scripts/ripwire_engine.py --recall "<query>"` for structural lookup.
+3. Layer 1 Routing: Run `python .agency/scripts/laya_engine.py --route "<task>"` for pod selection.
+4. Quality Gate: Zero placeholder tokens (`[TBD]`, `[TODO]`) and mandatory `## ✍️ Human Lead Decision & Sign-Off Block`.
+5. Validation: Verify phase completion with `python agency.py validate --advance`.

@@ -1,9 +1,9 @@
 ---
 template_id: "17"
-phase: 3
-assigned_role: "09_devops_sre_engineer"
-context_from: ["04_system_design_architecture.md"]
-outputs_to: []
+phase: 6
+assigned_role: "engineering/devops_sre_engineer"
+context_from: ["engineering/04_system_design_architecture.md", "engineering/07_deployment_runbook.md"]
+outputs_to: ["finance_ops/08_post_launch_sla.md"]
 status: template
 ---
 # Template 17: Disaster Recovery & Business Continuity Plan (BCP)
@@ -35,6 +35,17 @@ Required within 48 hours of any downtime exceeding 1 hour.
 - How was it fixed?
 - What engineering steps are being taken to ensure this specific failure never happens again?
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 disaster recovery commitments and wait for the human lead's explicit approval before proceeding.)*
+
+* **Key Decision 1 (RTO & RPO Commitments):** `[Agreed Recovery Time Objective and Recovery Point Objective limits]`
+* **Key Decision 2 (Database PITR & Backups):** `[Verified automated daily backups and tested point-in-time restoration]`
+* **Key Decision 3 (Failover Topology):** `[Documented DNS and secondary host failover steps]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -43,6 +54,7 @@ Required within 48 hours of any downtime exceeding 1 hour.
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

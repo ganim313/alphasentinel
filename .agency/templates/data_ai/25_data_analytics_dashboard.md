@@ -2,8 +2,8 @@
 template_id: "25"
 phase: 4
 assigned_role: "data_ai/data_analyst"
-context_from: ["03_requirements_engineering.md", "04_system_design_architecture.md"]
-outputs_to: ["05_technical_sdlc_execution.md"]
+context_from: ["product_design/03_requirements_engineering.md", "engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 25: Data Analytics & SQL Dashboard Specification
@@ -75,14 +75,24 @@ ORDER BY report_date DESC;
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (KPI Definitions):** `[Agreement on exact SQL calculation formulas for core metrics]`
 * **Key Decision 2 (Performance & Views):** `[Materialized view refresh frequency and indexing strategy]`
 * **Key Decision 3 (Data Privacy):** `[Retention window and PII masking guidelines]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -95,4 +105,4 @@ ORDER BY report_date DESC;
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 25_data_analytics_dashboard.md
+- [ ] `data_ai/25_data_analytics_dashboard.md`

@@ -1,5 +1,5 @@
 ---
-name: SkillUI Generator
+name: skillui-generator
 description: Uses the open-source SkillUI tool to reverse-engineer a target website's design system into a usable skill file for your agents.
 ---
 

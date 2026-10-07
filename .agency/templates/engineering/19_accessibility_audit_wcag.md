@@ -1,9 +1,9 @@
 ---
 template_id: "19"
 phase: 5
-assigned_role: "03_ui_ux_designer"
-context_from: ["10_ui_ux_handoff.md"]
-outputs_to: []
+assigned_role: "product_design/ui_ux_designer"
+context_from: ["product_design/10_ui_ux_handoff.md"]
+outputs_to: ["engineering/06_testing_uat_signoff.md"]
 status: template
 ---
 # Template 19: Accessibility (a11y) Audit Checklist
@@ -30,6 +30,23 @@ status: template
 - [ ] Install `eslint-plugin-jsx-a11y` in the Next.js project to catch accessibility errors during development.
 - [ ] Run Lighthouse Accessibility Audits during the CI/CD pipeline and block deployment if the score drops below 90.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
+
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Note 1: e.g., Verified WCAG 2.1 AA contrast and keyboard navigation across checkout flows.]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -42,4 +59,4 @@ status: template
 
 ### Context Package for Next Agent
 The following artifacts must be passed to the next phase:
-- [ ] 19_accessibility_audit_wcag.md
+- [ ] `engineering/19_accessibility_audit_wcag.md`

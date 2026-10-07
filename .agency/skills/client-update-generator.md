@@ -1,5 +1,5 @@
 ---
-name: Client Update Generator
+name: client-update-generator
 description: Translates technical git commits and task completions into a polished, non-technical weekly update email for the client.
 ---
 

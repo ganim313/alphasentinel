@@ -1,9 +1,9 @@
 ---
 template_id: "05"
 phase: 4
-assigned_role: "05_backend_engineer"
-context_from: ["04_system_design_architecture.md"]
-outputs_to: ["06_testing_uat_signoff.md"]
+assigned_role: "engineering/backend_engineer"
+context_from: ["engineering/04_system_design_architecture.md"]
+outputs_to: ["engineering/06_testing_uat_signoff.md"]
 status: template
 ---
 # Template 05: Technical SDLC & Agile Execution
@@ -40,6 +40,17 @@ Set up strict isolation between testing and production:
   - `Backlog` -> `To Do` -> `In Progress` -> `In Review (PR)` -> `QA` -> `Done`
 - Require a strict **Definition of Done (DoD)** before moving a card to `Done`.
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 SDLC implementation decisions and wait for the human lead's explicit approval before proceeding to Phase 5 Testing.)*
+
+* **Key Decision 1 (Branching & CI Gating):** `[Confirmed PR review rules, linter/typecheck gates, and staging branch strategy]`
+* **Key Decision 2 (Contract & Schema Parity):** `[Verified Frontend and Backend implementations match 04_system_design_architecture.md with 0 drift]`
+* **Key Decision 3 (Sprint Deliverable Completeness):** `[Confirmation that all MVP features in the sprint backlog are implemented and unit-tested]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -48,6 +59,7 @@ Set up strict isolation between testing and production:
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

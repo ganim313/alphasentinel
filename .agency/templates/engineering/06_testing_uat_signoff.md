@@ -1,9 +1,9 @@
 ---
 template_id: "06"
 phase: 5
-assigned_role: "07_qa_sdet_engineer"
-context_from: ["05_technical_sdlc_execution.md"]
-outputs_to: ["07_deployment_runbook.md"]
+assigned_role: "engineering/qa_sdet_engineer"
+context_from: ["engineering/05_technical_sdlc_execution.md"]
+outputs_to: ["engineering/07_deployment_runbook.md"]
 status: template
 ---
 # Template 06: Testing Pyramid & Client UAT
@@ -32,7 +32,9 @@ status: template
 ## 3. Formal UAT Sign-Off (Template)
 *(Require the client to reply to an email with this statement)*:
 
-> "I, [Client Name], have tested the software on the staging environment. I confirm that all features outlined in the original Product Requirements Document (PRD) are present and functioning correctly. I approve this version for deployment to Production."---
+> "I, [Client Name], have tested the software on the staging environment. I confirm that all features outlined in the original Product Requirements Document (PRD) are present and functioning correctly. I approve this version for deployment to Production."
+
+---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
 *(AI: You MUST pause here. Present the test suite and UAT readiness metrics and wait for the human lead's explicit approval before proceeding to Deployment.)*

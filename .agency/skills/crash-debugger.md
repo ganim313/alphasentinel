@@ -1,5 +1,5 @@
 ---
-name: Crash Debugger
+name: crash-debugger
 description: Reads production error logs and stack traces to automatically diagnose the root cause and suggest the exact code fix.
 ---
 

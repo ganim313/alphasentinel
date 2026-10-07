@@ -1,8 +1,25 @@
 """
-DhanHQ v2 REST Execution Broker Client.
-Provides order routing, order status polling, cancellation, and position reconciliation
-strictly guarded by settings.LIVE_TRADING_ENABLED and settings.PAPER_TRADING_MODE.
+================================================================================
+DEPRECATED: src/execution/dhan_broker.py
+================================================================================
+DEPRECATION NOTICE:
+This module is DEPRECATED. FYERS API v3 CNC delivery (`NSE:EQ`) with server-side
+GTT OCO order placement is the canonical broker execution adapter for AlphaSentinel.
+
+DhanHQ v2 REST broker adapter is retained strictly for historical reference / simulated fallback
+and MUST NOT be used for live trade routing in production.
+
+CANONICAL BROKER:
+- FYERS API v3 via `src/ingestion/fyers_client.py` and `scripts/fyers_auth.py`.
+================================================================================
 """
+
+import warnings
+warnings.warn(
+    "src/execution/dhan_broker.py is DEPRECATED: FYERS CNC is canonical.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 import json
 import logging
@@ -20,8 +37,8 @@ DHAN_API_BASE_URL = "https://api.dhan.co/v2"
 
 class DhanBroker:
     """
-    Production-ready DhanHQ v2 REST broker adapter.
-    When LIVE_TRADING_ENABLED is False (default), safely routes orders to PaperBroker.
+    DEPRECATED DhanHQ v2 REST broker adapter.
+    Retained for fallback / simulation. FYERS API v3 is canonical.
     """
 
     @staticmethod
@@ -49,6 +66,7 @@ class DhanBroker:
         Structures and routes a Dhan Order (Entry + Target + Stop Loss).
         Guarded by LIVE_TRADING_ENABLED safety gate.
         """
+        logger.warning("DEPRECATED: DhanBroker is deprecated. FYERS CNC is canonical broker adapter.")
         from src.execution.order_manager import PaperBroker
 
         if not getattr(settings, "LIVE_TRADING_ENABLED", False):

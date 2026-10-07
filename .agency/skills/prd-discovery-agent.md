@@ -1,5 +1,5 @@
 ---
-name: PRD Discovery Agent
+name: prd-discovery-agent
 description: Transforms vague client ideas or rough personal product concepts into a complete, detailed PRD through a structured Socratic interview with the AI.
 ---
 

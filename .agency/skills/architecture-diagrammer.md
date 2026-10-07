@@ -1,5 +1,5 @@
 ---
-name: Architecture Diagrammer
+name: architecture-diagrammer
 description: Generates system architecture, Entity-Relationship, and Sequence diagrams from a Product Requirements Document (PRD).
 ---
 

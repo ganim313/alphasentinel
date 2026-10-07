@@ -28,9 +28,9 @@ def test_arbiter_default_capital():
         adtv_20d=50_000_000.0
     )
     assert res["verdict"] == "APPROVE"
-    # Capital deployed should be clean ₹1.2 Lakhs (12% of 10L) rather than being capped at ₹12,000 (12% of 1L)
+    # Capital deployed should be clean rather than being capped at ₹12,000 (12% of 1L)
     assert res["total_capital_deployed"] > 50_000.0
-    assert res["portfolio_allocation_pct"] <= 12.0
+    assert res["portfolio_allocation_pct"] <= 16.0
 
 
 def test_eod_reconciliation_pnl_with_quantity():

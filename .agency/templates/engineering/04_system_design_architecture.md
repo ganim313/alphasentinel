@@ -1,9 +1,9 @@
 ---
 template_id: "04"
 phase: 3
-assigned_role: "02_solutions_architect"
-context_from: ["03_requirements_engineering.md"]
-outputs_to: ["05_technical_sdlc_execution.md"]
+assigned_role: "engineering/solutions_architect"
+context_from: ["product_design/03_requirements_engineering.md"]
+outputs_to: ["engineering/05_technical_sdlc_execution.md"]
 status: template
 ---
 # Template 04: System Design & Architecture (HLD & LLD)
@@ -46,7 +46,9 @@ status: template
 
 ## 4. State Management & Frontend Architecture
 * How will global UI state be handled? (e.g., React Context, Redux, Zustand).
-* How will server-state be cached? (e.g., React Query, SWR).---
+* How will server-state be cached? (e.g., React Query, SWR).
+
+---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
 *(AI: You MUST pause here. Present the top 3 architectural trade-offs and wait for the human lead's explicit approval before proceeding to implementation.)*

@@ -1,0 +1,13 @@
+---
+description: "Activate when working on technical SEO, Schema.org JSON-LD, Core Web Vitals, landing page conversion copywriting, UTM tracking, or paid media campaigns."
+globs: [".agency/templates/marketing/**/*", ".agency/active/marketing/**/*"]
+alwaysApply: false
+---
+
+# Department Pod: Marketing
+
+## Assigned Specialists
+- `@marketing/copywriter` (`.agency/agents/marketing/copywriter.md`): Lead UX Copywriter & Brand Voice Guardian governing microcopy, empty states, error recovery text, and CTA conversion.
+- `@marketing/seo_engineer` (`.agency/agents/marketing/seo_engineer.md`): Principal Technical SEO Engineer governing crawlability, Schema.org JSON-LD, Core Web Vitals ranking factors, and canonical architecture.
+- `@marketing/growth_hacker` (`.agency/agents/marketing/growth_hacker.md`): Principal Growth Engineer & Acquisition Strategist designing viral loops, referral systems, funnel telemetry, and statistically powered A/B tests.
+- `@marketing/paid_media_buyer` (`.agency/agents/marketing/paid_media_buyer.md`): Principal Performance Marketing & Paid Acquisition Strategist governing PPC, Meta, LinkedIn campaigns, CAPI attribution, and CAC/LTV unit economics.

@@ -2,8 +2,8 @@
 template_id: "28"
 phase: 5
 assigned_role: "product_design/user_researcher"
-context_from: ["03_requirements_engineering.md", "10_ui_ux_handoff.md"]
-outputs_to: ["06_testing_uat_signoff.md"]
+context_from: ["product_design/03_requirements_engineering.md", "product_design/10_ui_ux_handoff.md"]
+outputs_to: ["engineering/06_testing_uat_signoff.md"]
 status: template
 ---
 # Template 28: Usability Testing Report
@@ -64,14 +64,24 @@ status: template
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (SUS Score & Usability Gate):** `[Confirmation that usability thresholds meet launch criteria]`
 * **Key Decision 2 (High-Severity Remediation):** `[Agreed design fixes for identified UX bottlenecks]`
 * **Key Decision 3 (UAT Readiness):** `[Approval to advance build to formal UAT sign-off]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -84,4 +94,4 @@ status: template
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 28_usability_testing_report.md
+- [ ] `product_design/28_usability_testing_report.md`

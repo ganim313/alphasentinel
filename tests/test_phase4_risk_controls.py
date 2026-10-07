@@ -275,10 +275,11 @@ def test_llm_gateway_circuit_breaker_cooldown_recovery():
 # P4-3: VCP Regime Bypass Rule Tests
 # -------------------------------------------------------------------------
 
-def test_vcp_regime_bypass_allows_high_rs_at_half_size():
+def test_vcp_regime_bypass_removed_zero_entries_in_risk_off():
     """
-    Asserts rs_score > 15.0 with volume dryup returns regime_bypass_size_reduction = 0.5
-    when regime filter fails.
+    Asserts that when market regime is RISK_OFF (0), evaluate_minervini_vcp_batch()
+    produces ZERO buy signals (returns empty list []) regardless of high RS score
+    or volume dryup, confirming bear-market bypass is permanently eliminated.
     """
     sym = "TEST_VCP_BYPASS"
     today = datetime.date.today()
@@ -333,12 +334,8 @@ def test_vcp_regime_bypass_allows_high_rs_at_half_size():
             with patch("src.utils.benchmark_provider.get_benchmark_returns", return_value=pd.Series([0.0] * 100)):
                 res = evaluate_minervini_vcp_batch([sym], conn)
 
-    assert len(res) == 1
-    cand = res[0]
-    assert cand["symbol"] == sym
-    assert cand["rs_score"] > 15.0
-    assert cand["volume_dryup"] is True
-    assert cand["regime_bypass_size_reduction"] == 0.5
+    assert res == []
+    assert len(res) == 0
 
 
 def test_vcp_regime_bypass_rejects_low_rs():

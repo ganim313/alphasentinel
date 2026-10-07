@@ -1,36 +1,59 @@
-# Master Engineering Departments Directory (TEAMS.md)
+# 👥 Multi-Agent Department & Pod Topology (`.agency/teams/TEAMS.md`)
 
-This directory organizes all AI agents, specialized skills, and deliverable templates into **8 dedicated industry-standard engineering departments**. 
-
-Summon any department lead directly by referencing their role charter in `.agency/agents/`.
+The Agency Playbook organizes its **25 specialized agents** into **6 execution departments** plus **1 adversarial oversight division**, coordinated by **Ripwire (Layer 0)** lane partitioning and **Laya (Layer 1)** task routing.
 
 ---
 
-## The 8 Department Pods & Canonical Roles
+## 🏛️ Department Roster
 
-| Pod | Department Name | Canonical Lead Role File | Owned Skills | Core Deliverables |
-| :--- | :--- | :--- | :--- | :--- |
-| **01** | **Product & Requirements** | [`01_product_manager.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/01_product_manager.md) | `prd-discovery-agent`, `client-intake-parser`, `business-model-analyst`, `proposal-pricing-calculator` | SOW (`01`), PRD (`03`), Intake (`13`), Change Orders (`14`) |
-| **02** | **Architecture & Systems** | [`02_solutions_architect.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/02_solutions_architect.md) | `tech-stack-adviser`, `architecture-diagrammer`, `repowise-codebase-mapper` | System Design HLD/LLD (`04`), Developer Onboarding (`15`) |
-| **03** | **Frontend & UI/UX** | [`03_ui_ux_designer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/03_ui_ux_designer.md) & [`04_frontend_engineer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/04_frontend_engineer.md) | `senior-designer-ui`, `skillui-generator`, `wcag-accessibility-auditor`, `impeccable`, `android-cli` | UI/UX Handoff (`10`), WCAG Audit (`19`), Client UI Code |
-| **04** | **Backend & Data Systems** | [`05_backend_engineer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/05_backend_engineer.md) & [`06_database_engineer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/06_database_engineer.md) | `supabase-database-audit`, Prisma/SQL migrations, Zod API Validation | SDLC Execution (`05`), DB Migrations, API Controllers |
-| **05** | **QA & Pre-Production** | [`07_qa_sdet_engineer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/07_qa_sdet_engineer.md) | `testing-coverage-audit`, `performance-audit`, `observability-audit`, Playwright test runner | Testing & UAT Sign-off (`06`), Automated Test Suites |
-| **06** | **Security & Red Team** | [`08_security_auditor.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/08_security_auditor.md) & [`challenger_critic.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/challenger_critic.md) | `strix-security-auditor`, `security-audit`, `devils-advocate-critic` | Security Compliance (`09`), Risk Assessment (`20`), DAST Pentests |
-| **07** | **DevOps & Release** | [`09_devops_sre_engineer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/09_devops_sre_engineer.md) | `deployment-cicd-audit`, `crash-debugger`, `bootstrap.sh`, `validate_phase.py` | Deployment Runbook (`07`), Disaster Recovery (`17`), CI/CD Pipelines |
-| **08** | **Operations & Legal** | [`10_legal_operations_officer.md`](file:///C:/Users/Md%20Ganim/Desktop/agency_playbook/.agency/agents/10_legal_operations_officer.md) | `legal-risk-flagging`, `client-update-generator`, `legacy-project-onboarder`, `brand-identity-architect` | MSA (`02`), SLA (`08`), GTM (`11`), Post-Mortem (`12`), Handoff (`16`), DPA (`18`) |
+### 1. Product & Design (`product_design`)
+- `.agency/agents/product_design/product_manager.md` (Role 01)
+- `.agency/agents/product_design/ui_ux_designer.md` (Role 03)
+- `.agency/agents/product_design/user_researcher.md` (Role 23)
+
+### 2. Engineering (`engineering`)
+- `.agency/agents/engineering/solutions_architect.md` (Role 02)
+- `.agency/agents/engineering/frontend_engineer.md` (Role 04)
+- `.agency/agents/engineering/backend_engineer.md` (Role 05)
+- `.agency/agents/engineering/database_engineer.md` (Role 06)
+- `.agency/agents/engineering/qa_sdet_engineer.md` (Role 07)
+- `.agency/agents/engineering/security_auditor.md` (Role 08)
+- `.agency/agents/engineering/devops_sre_engineer.md` (Role 09)
+- `.agency/agents/engineering/mobile_app_engineer.md` (Role 15)
+
+### 3. Finance & Legal Operations (`finance_ops`)
+- `.agency/agents/finance_ops/legal_operations_officer.md` (Role 10)
+- `.agency/agents/finance_ops/finance_strategist.md` (Role 19)
+- `.agency/agents/finance_ops/administrative_ops.md` (Role 20)
+
+### 4. Data & AI (`data_ai`)
+- `.agency/agents/data_ai/data_analyst.md` (Role 11)
+- `.agency/agents/data_ai/data_scientist.md` (Role 17)
+- `.agency/agents/data_ai/ml_engineer.md` (Role 18)
+
+### 5. Marketing & Growth (`marketing`)
+- `.agency/agents/marketing/copywriter.md` (Role 12)
+- `.agency/agents/marketing/seo_engineer.md` (Role 13)
+- `.agency/agents/marketing/growth_hacker.md` (Role 14)
+- `.agency/agents/marketing/paid_media_buyer.md` (Role 16)
+
+### 6. Sales & Client Success (`sales_client`)
+- `.agency/agents/sales_client/account_manager.md` (Role 21)
+- `.agency/agents/sales_client/business_development_rep.md` (Role 22)
+
+### 7. Adversarial Oversight (`oversight`)
+- `.agency/agents/oversight/master_critic.md` (Role 24)
+- `.agency/agents/oversight/code_integrity_guardian.md` (Role 25)
 
 ---
 
-## Contract-First Pipeline Flow
+## ⚡ Parallel Execution Pods (Ripwire Disjoint Lanes)
 
-```mermaid
-flowchart TD
-    P1["Pod 01: Product & Requirements<br/>(@01_product_manager.md)"] --> P2["Pod 02: Architecture & Systems<br/>(@02_solutions_architect.md)"]
-    P2 --> P3["Pod 03: Frontend & UI/UX<br/>(@04_frontend_engineer.md)"]
-    P2 --> P4["Pod 04: Backend & Data<br/>(@05_backend_engineer.md)"]
-    P3 --> P5["Pod 05: QA & Pre-Production<br/>(@07_qa_sdet_engineer.md)"]
-    P4 --> P5
-    P5 --> P6["Pod 06: Security Red Team<br/>(@08_security_auditor.md)"]
-    P6 --> P7["Pod 07: DevOps & Release<br/>(@09_devops_sre_engineer.md)"]
-    P7 --> P8["Pod 08: Operations & Legal<br/>(@10_legal_operations_officer.md)"]
+Before spawning parallel agents in Phase 4, run:
+```bash
+python .agency/scripts/ripwire_engine.py --pack-task "<feature>" --partition=3 --plan-lanes=3
 ```
+- **Lane 1 (Data & Migrations):** `.agency/agents/engineering/database_engineer.md`
+- **Lane 2 (Backend API & AI):** `.agency/agents/engineering/backend_engineer.md` + `.agency/agents/data_ai/ml_engineer.md`
+- **Lane 3 (Frontend & Mobile UI):** `.agency/agents/engineering/frontend_engineer.md` + `.agency/agents/engineering/mobile_app_engineer.md`
+- **Pre-Merge Gate:** Run `python .agency/scripts/ripwire_engine.py --merge-scout` and `python .agency/scripts/laya_engine.py --screen-code .` followed by `.agency/agents/oversight/code_integrity_guardian.md`.

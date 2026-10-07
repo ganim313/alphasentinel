@@ -1,5 +1,5 @@
 ---
-name: Legacy Project Onboarder
+name: legacy-project-onboarder
 description: Reverse-engineers an existing or mid-flight codebase to automatically generate the missing agency documentation (PRD, Architecture, Runbooks).
 ---
 

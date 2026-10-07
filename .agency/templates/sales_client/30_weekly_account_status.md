@@ -2,8 +2,8 @@
 template_id: "30"
 phase: 4
 assigned_role: "sales_client/account_manager"
-context_from: ["03_requirements_engineering.md", "05_technical_sdlc_execution.md"]
-outputs_to: ["30_weekly_account_status.md"]
+context_from: ["product_design/03_requirements_engineering.md", "engineering/05_technical_sdlc_execution.md"]
+outputs_to: ["sales_client/30_weekly_account_status.md"]
 status: template
 ---
 # Template 30: Weekly Client Account Status Report
@@ -62,14 +62,24 @@ Highlight tangible features completed in language the client's executive team un
 ---
 
 ## ✍️ Human Lead Decision & Sign-Off Block
-*(AI: You MUST pause here. Present the top 3 decisions made and wait for the human lead's explicit approval before proceeding.)*
+*(Strictly used to gate progress and record architectural/business decisions)*
+
+**Reviewed By:** `[Human Lead Name]`
+**Date:** `[YYYY-MM-DD]`
 
 * **Key Decision 1 (Health Rating):** `[Confirmed RAG rating and schedule accuracy]`
 * **Key Decision 2 (Client Action Items):** `[Highlighted client blockers with explicit deadlines]`
 * **Key Decision 3 (Budget Burn):** `[Verified hours and budget alignment]`
 
-* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
-* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
+### Decision (Select One):
+1. [ ] **Approved:** Proceed to the next phase / merge the PR.
+2. [ ] **Approved with Minor Revisions:** Proceed, but resolve the inline comments before final handoff.
+3. [ ] **Rejected (Requires Rework):** Blocked. The agent/developer must address the critical flaws noted below and resubmit.
+
+**Lead Notes / Specific Overrides:**
+* `[Type 'Approved' or enter adjustments]`
+
+**Status:** ⏳ Awaiting Approval
 
 ---
 
@@ -82,4 +92,4 @@ Highlight tangible features completed in language the client's executive team un
 - [ ] Human Lead has explicitly signed off above.
 
 ### Context Package for Next Agent
-- [ ] 30_weekly_account_status.md
+- [ ] `sales_client/30_weekly_account_status.md`

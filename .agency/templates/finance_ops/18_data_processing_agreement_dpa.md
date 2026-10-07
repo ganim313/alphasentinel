@@ -1,9 +1,9 @@
 ---
 template_id: "18"
 phase: 1
-assigned_role: "10_legal_operations_officer"
-context_from: ["02_msa_contract.md"]
-outputs_to: []
+assigned_role: "finance_ops/legal_operations_officer"
+context_from: ["finance_ops/02_msa_contract.md"]
+outputs_to: ["product_design/03_requirements_engineering.md"]
 status: template
 ---
 # Template 18: Data Processing Agreement (DPA)
@@ -34,6 +34,17 @@ The Client authorizes the use of the following third-party infrastructure to pro
 
 *(Signatures of both parties required before processing live data)*
 
+---
+
+## ✍️ Human Lead Decision & Sign-Off Block
+*(AI: You MUST pause here. Present the top 3 data privacy & GDPR/CCPA terms and wait for the human lead's explicit approval before proceeding.)*
+
+* **Key Decision 1 (Controller vs Processor Roles):** `[Confirmed Client is Data Controller and Agency acts strictly as Data Processor]`
+* **Key Decision 2 (Authorized Sub-Processors):** `[Approved cloud sub-processors: e.g., Supabase, AWS, Vercel, Resend]`
+* **Key Decision 3 (Breach Notification & Deletion):** `[72-hour breach notification SLA and 30-day post-termination data destruction]`
+
+* **Human Lead Sign-Off:** ⏳ Awaiting Approval / ✅ Approved / 🔄 Revisions Requested
+* **Human Overrides / Adjustments:** `[Type 'Approved' or enter adjustments]`
 
 ---
 
@@ -42,6 +53,7 @@ The Client authorizes the use of the following third-party infrastructure to pro
 ### Pre-Flight Checks
 - [ ] Deliverable has been reviewed against requirements.
 - [ ] No placeholder blocks (e.g. `[ ]`) remain unfilled.
+- [ ] Human Lead has explicitly signed off above.
 - [ ] Output complies with project_state.yml guidelines.
 
 ### Context Package for Next Agent

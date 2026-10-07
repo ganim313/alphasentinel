@@ -1,0 +1,11 @@
+---
+description: "Activate when performing adversarial red-team audits, pre-merge code integrity reviews, placeholder checks, or phase gate sign-off verifications."
+globs: [".agency/agents/oversight/**/*", ".agency/active/**/*"]
+alwaysApply: false
+---
+
+# Department Pod: Oversight
+
+## Assigned Specialists
+- `@oversight/master_critic` (`.agency/agents/oversight/master_critic.md`): System-wide Principal Adversarial Auditor that red-teams all deliverables and code before persistence to prevent hallucinations, scope traps, and logic flaws.
+- `@oversight/code_integrity_guardian` (`.agency/agents/oversight/code_integrity_guardian.md`): Principal Codebase Protector that audits proposed source diffs via Ripwire and Laya to prevent destructive overwrites, lazy truncation, and regressions.

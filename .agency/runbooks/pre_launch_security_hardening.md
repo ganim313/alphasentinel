@@ -1,51 +1,46 @@
-# 🛡️ Scenario Runbook: Pre-Launch Security & Quality Hardening
+# 🔐 Runbook: Pre-Launch Security & Production Hardening
 
-**Objective:** Execute an exhaustive security, accessibility, and performance audit before exposing a production application to public traffic or enterprise client review.
-
----
-
-## 👥 Assigned Agent Squad
-
-| Role | Agent File | Primary Mission |
-| :--- | :--- | :--- |
-| **Security Auditor** | `@08_security_auditor.md` | Execute SAST/DAST vulnerability scans, RLS audits, and secret detection |
-| **QA SDET Engineer** | `@07_qa_sdet_engineer.md` | Run full automated E2E test suites and load tests |
-| **Accessibility Auditor**| `@wcag-accessibility-auditor.md`| Audit frontend for WCAG 2.1 AA compliance |
-| **Master Critic** | `@master_critic.md` | Adversarial red-team testing to attempt privilege escalation |
-| **DevOps SRE Lead** | `@09_devops_sre_engineer.md` | Verify backup restoration, TLS configuration, and rate limiting |
+**Trigger:** 48–72 hours prior to a major production launch or when responding to a security audit (`entry_mode: "security_incident"`).
+**Objective:** Verify zero critical vulnerabilities, enforce infrastructure resilience, and obtain final Go/No-Go authorization.
 
 ---
 
-## ⚡ 4-Stage Hardening Flow
+## 🛡️ Step 1: Application & API Security Audit
+**Active Role:** `@.agency/agents/engineering/security_auditor.md`
+**Skill:** `@.agency/skills/strix-security-auditor/SKILL.md` (`.agents/plugins/agency-playbook/skills/strix-security-auditor/SKILL.md`)
 
-```mermaid
-flowchart TD
-    H1["Stage 1: Secret & Dependency Scan<br/>(Gitleaks / Semgrep / npm audit)"] --> H2["Stage 2: DAST & Auth Red-Team<br/>(@08_security & @master_critic)"]
-    H2 --> H3["Stage 3: WCAG & Performance Audit<br/>(Lighthouse / @wcag-auditor)"]
-    H3 --> H4["Stage 4: Compliance & Sign-off<br/>(09_security_compliance.md)"]
-```
+- [ ] **Authentication & Session Management:** Verify JWT expiration, secure/HttpOnly cookies, CSRF protection, and brute-force rate limiting.
+- [ ] **Authorization (IDOR & BOLA):** Test that User A cannot read or mutate User B's resources by swapping UUIDs/IDs or Tenant headers.
+- [ ] **Input Validation & Injection:** Confirm all API endpoints validate payloads via strict schemas (Zod/Pydantic) and parameterized queries.
+- [ ] **Secrets Hygiene:** Confirm `.env` files are gitignored and zero secrets exist in source bundles (`python .agency/scripts/laya_engine.py --screen-code .`).
+- [ ] **Third-Party Vendor Risk:** Audit external processors in `.agency/templates/finance_ops/20_third_party_risk_assessment.md`.
 
-### Stage 1: Static Code & Dependency Audit
-1. Audit for exposed secrets and vulnerable dependencies:
-   > *"Run `@08_security_auditor.md` on the repository. Check for hardcoded API keys, outdated npm/pip packages with known CVEs, and insecure environment variable fallbacks."*
-
-### Stage 2: Authorization & Business Logic Red-Teaming
-1. Audit multi-tenant isolation and IDOR vulnerabilities:
-   > *"Act as `@master_critic.md` and `@08_security_auditor.md`. Red-team the database Row-Level Security (RLS) policies and API endpoint authorization checks. Attempt to craft an IDOR payload that accesses another tenant's records."*
-
-### Stage 3: Accessibility & Core Web Vitals Audit
-1. Audit client UI accessibility:
-   > *"Run `@wcag-accessibility-auditor.md` on all frontend templates. Verify high contrast ratios, form `aria-label` tags, and keyboard focus states."*
-2. Verify production build bundle size and Core Web Vitals benchmarks.
-
-### Stage 4: Production Runbook & Compliance Sign-off
-1. Verify database automated daily backups and point-in-time recovery.
-2. Complete and sign off `09_security_compliance.md` and `19_accessibility_audit_wcag.md`.
+**Deliverable:** Complete `.agency/templates/engineering/09_security_compliance.md`.
 
 ---
 
-## ✅ Definition of Done (DoD)
-1. Zero 🔴 Critical or High severity vulnerabilities in static/dynamic scans.
-2. All multi-tenant queries enforce strict tenant ID checks.
-3. WCAG 2.1 AA compliance verified across all public and authenticated screens.
-4. Disaster recovery point-in-time restore tested and documented.
+## ⚙️ Step 2: Infrastructure, Observability & Disaster Recovery
+**Active Role:** `@.agency/agents/engineering/devops_sre_engineer.md` & `@.agency/agents/engineering/database_engineer.md`
+
+- [ ] **Database Readiness:** Connection pooling active; automated backups enabled; Point-in-Time Recovery (PITR) verified in `.agency/templates/engineering/17_disaster_recovery_bcp.md`.
+- [ ] **Zero-Downtime Deployments:** Health check endpoints (`/healthz`) verify DB connectivity before routing traffic; rollback procedure takes `< 5 minutes`.
+
+**Deliverable:** Complete `.agency/templates/engineering/07_deployment_runbook.md`.
+
+---
+
+## 🧪 Step 3: Accessibility, Performance & E2E Sign-Off
+**Active Roles:** `@.agency/agents/engineering/qa_sdet_engineer.md` & `@.agency/agents/product_design/ui_ux_designer.md`
+**Skill:** `@.agency/skills/wcag-accessibility-auditor/SKILL.md`
+
+- [ ] **Critical Path E2E:** 100% pass rate on automated Playwright E2E tests in staging (`.agency/templates/engineering/06_testing_uat_signoff.md`).
+- [ ] **WCAG 2.1 AA Compliance:** Complete accessibility audit in `.agency/templates/engineering/19_accessibility_audit_wcag.md`.
+- [ ] **Layer 0 & Layer 1 Gate:** Run `python .agency/scripts/ripwire_engine.py --quality-delta --doc-drift` and `python .agency/scripts/laya_engine.py --screen-code .` with zero blocking alerts.
+
+---
+
+## ⚖️ Step 4: Final Critic Gate & Human Go/No-Go
+**Active Roles:** `@.agency/agents/oversight/master_critic.md` & `@.agency/agents/oversight/code_integrity_guardian.md`
+
+1. Run `python agency.py validate` across all Phase 5 and Phase 6 deliverables.
+2. Present the final readiness summary to the **Human Lead** for explicit sign-off before flipping production traffic.

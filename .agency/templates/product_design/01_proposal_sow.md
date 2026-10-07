@@ -1,9 +1,9 @@
 ---
 template_id: "01"
 phase: 1
-assigned_role: "01_product_manager"
-context_from: ["13_client_intake_questionnaire.md"]
-outputs_to: ["02_msa_contract.md"]
+assigned_role: "product_design/product_manager"
+context_from: ["sales_client/13_client_intake_questionnaire.md"]
+outputs_to: ["finance_ops/02_msa_contract.md"]
 status: template
 ---
 # Template 01: Proposal & Statement of Work (SOW)

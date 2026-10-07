@@ -23,10 +23,10 @@ def test_deterministic_risk_arbiter_sizing():
     )
     
     assert result["verdict"] == "APPROVE"
-    assert result["stop_loss_price"] == 94.6 # 100 - (1.8 * 3) = 94.6
+    assert result["stop_loss_price"] == 92.5 # 100 - (2.5 * 3) = 92.5
     assert result["target_1_price"] > 100.0
     assert result["suggested_shares"] > 0
-    assert result["portfolio_allocation_pct"] <= 12.0 # Capped at 12%
+    assert result["portfolio_allocation_pct"] <= 16.0 # Unchoked up to 16%
     
     # 2. Dangerous 5% Circuit Band setup (Should automatically halve size)
     result_circuit = calculate_deterministic_risk_and_position(
